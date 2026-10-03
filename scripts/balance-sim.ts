@@ -1,4 +1,5 @@
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { choosePlan } from "../src/game/ai";
 import { CHARACTERS, type Difficulty, type Side } from "../src/game/content";
 import { createGame, suggestedSetup } from "../src/game/model";
@@ -9,6 +10,7 @@ const NAMES: Record<string, string> = Object.fromEntries(CHARACTERS.map((c) => [
 const GAMES = 16;
 const MAX_ROUNDS = 28;
 const DIFF: Difficulty = "taktisch";
+const OUTPUT_DIR = resolve(process.argv[2] ?? process.env.ECHO_BRUCH_ARTIFACTS ?? "./artifacts");
 
 function mulberry32(seed: number) {
   let a = seed >>> 0;
@@ -167,7 +169,7 @@ lines.push("Jäger: Kraft 7, Schutz 4, Bogen 4. Erster Treffer −4. Markierung 
 lines.push(`Paarungen ${IDS.length}×${IDS.length} · ${GAMES} Samen · Schwierigkeit ${DIFF} · Deckel ${MAX_ROUNDS} Runden`);
 lines.push(`Duelle ${bouts.length} · vollständig, nicht gekürzt`);
 lines.push("");
-const vorherPath = "/workspace/artifacts/echo-bruch-bilanz-vorher.txt";
+const vorherPath = resolve(OUTPUT_DIR, "echo-bruch-bilanz-vorher.txt");
 if (existsSync(vorherPath)) {
   lines.push("VORHER");
   lines.push(readFileSync(vorherPath, "utf8").trim());
@@ -219,9 +221,10 @@ for (const bout of bouts) {
 }
 
 const text = lines.join("\n");
-const out = "/workspace/artifacts/echo-bruch-protokoll.txt";
+mkdirSync(OUTPUT_DIR, { recursive: true });
+const out = resolve(OUTPUT_DIR, "echo-bruch-protokoll.txt");
 writeFileSync(out, text);
 const summary = lines.slice(0, lines.findIndex((line) => line.startsWith("=== "))).join("\n");
-writeFileSync("/workspace/artifacts/echo-bruch-bilanz.txt", summary);
+writeFileSync(resolve(OUTPUT_DIR, "echo-bruch-bilanz.txt"), summary);
 console.log(summary);
 console.log("\nGespeichert", out, "Zeichen", text.length);
