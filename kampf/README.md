@@ -11,3 +11,5 @@ Ego-Perspektive, Stein-Gang, Fackeln. Zwei Gegner, dieselben Ausgänge.
 - `hd/jaeger-film/` ein Film und die Schnitte daraus
 - `hd/platten/` frühere Schlüsselplatten
 - `hud/` übernehmbares Kampffenster, `KampfHud.set(zustand)`, plus Film mit HUD
+
+Balance, ein Schlagabtausch: Kraftbonus nur im Trefferwurf. Rohschaden ist Waffe minus Rüstung. Block zieht den Schutzbonus ab, mindestens 2. Ausweichen ist immer −2, kein Totalausfall. Ersttreffer von Archivar und Jäger ist auf 2 gedeckelt.

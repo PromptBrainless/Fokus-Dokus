@@ -1282,7 +1282,7 @@ function planHint(c: (typeof CHARACTERS)[number], draft: Plan, ready: Plan, f: F
   if (draft.action === "attack" && ready.action !== "attack") return "Nicht in Reichweite. Der Plan wird zu Schutz.";
   if (draft.action === "move") return ready.targetField ? `Ziel Feld ${ready.targetField}. Besetzte Felder bleiben zu.` : "Kein freies Feld in Reichweite.";
   if (draft.action === "guard") {
-    const power = draft.energy >= 1 ? 4 : 3;
+    const power = Math.max(2, liveStats(f).schutzB);
     return `Nächster Treffer −${power}${draft.energy >= 3 ? ". Dazu ein Schutz-Echo." : "."}`;
   }
   if (draft.influence === "kern") return `Kern-Echos in Reichweite ${distance(f.field, view.fighters[other(f.side)].field) <= 3 ? "ja" : "nein"}. Kostet mindestens 1 Energie.`;

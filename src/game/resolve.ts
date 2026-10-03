@@ -365,19 +365,18 @@ function resolveAttack(
 
   const energyRaw = plan.energy >= 3 ? 2 : plan.energy >= 1 ? 1 : 0;
   const energyBruch = plan.energy >= 2 ? 1 : 0;
-  let ignore = opts.ignoreSchutz + (marked ? 2 : 0) + (flankArmor ? 2 : 0);
   const brand = markerAt(state, defender.field)?.kind === "brand" ? 1 : 0;
+  // Kraftbonus zählt nur im Trefferwurf. Rohschaden ist die Waffe, abzüglich Rüstung.
   let raw =
     aStats.weapon +
-    aStats.kraftB +
     energyRaw +
     echoB.raw +
     brand +
     opts.rawMod +
     (flankArmor ? 2 : 0) -
     (dist === 0 && attacker.weaponId === "speer" ? 1 : 0);
-  const armorCut = flankArmor + (marked ? 1 : 0);
-  let end = Math.max(1, raw - Math.max(0, dStats.schutzB - ignore) - Math.max(0, aArmor(defender) - armorCut));
+  const armorCut = flankArmor + (marked ? 1 : 0) + opts.ignoreSchutz;
+  let end = Math.max(1, raw - Math.max(0, aArmor(defender) - armorCut));
   if (blockedByBarrier) end = Math.max(0, end - 2);
   const soak = guardEchoSoak(defender);
   end = Math.max(0, end - soak.dmg);
@@ -417,17 +416,13 @@ function resolveAttack(
     if (away != null) {
       leaveField(state, defender, defenderPlan);
       shift(state, defender, attacker, away);
-      if (distance(attacker.field, defender.field) > range) {
-        dodgedAll = true;
-        end = 0;
-        bruchMod = 0;
-      } else end = Math.max(0, end - 2);
     }
-    note(state, `${name(defender)} weicht aus.`);
+    end = Math.max(0, end - 2);
+    note(state, `${name(defender)} weicht aus. −2 Körper.`);
   }
 
   if (!dodgedAll && !defender.sheltered && end > 0) {
-    const cut = defender.characterId === "archivar" ? 6 : defender.characterId === "jaeger" ? 4 : 0;
+    const cut = defender.characterId === "archivar" || defender.characterId === "jaeger" ? 2 : 0;
     if (cut > 0) {
       const applied = Math.min(cut, end);
       end -= applied;
@@ -504,7 +499,7 @@ function doGuard(state: GameState, f: Fighter, plan: Plan) {
     note(state, `${name(f)} sperrt das Feld und steht fester.`);
     return;
   }
-  const power = plan.energy >= 1 ? 4 : 3;
+  const power = Math.max(2, liveStats(f).schutzB);
   addStatus(f, "guarded", 1, power);
   if (plan.energy >= 2) {
     const bad = f.statuses.find((s) => s.kind === "wounded" || s.kind === "bound" || s.kind === "confused");

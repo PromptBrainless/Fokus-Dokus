@@ -110,7 +110,7 @@ export const CHARACTERS: Character[] = [
     tempo: 4,
     cores: ["influence", "guard", "move"],
     passive:
-      "Ein durch Einfluss ohne Item erzeugtes Echo erhält 1 zusätzliche Ladung. Ein eigenes Echo auf dem Feld gibt +2 Verteidigung. Der erste Treffer des Kampfes ist um 6 Körper niedriger und legt ein Schutz-Echo mit 2 Ladungen.",
+      "Ein durch Einfluss ohne Item erzeugtes Echo erhält 1 zusätzliche Ladung. Ein eigenes Echo auf dem Feld gibt +2 Verteidigung. Der erste Treffer des Kampfes ist um 2 Körper niedriger und legt ein Schutz-Echo mit 2 Ladungen.",
     ability: "Verbindung",
     abilityCost: 3,
     abilityAction: "influence",
@@ -143,7 +143,7 @@ export const CHARACTERS: Character[] = [
     kontrolle: 4,
     tempo: 7,
     cores: ["attack", "move", "influence"],
-    passive: "Verlässt der Gegner sein Feld, +1 Angriffswert gegen ihn bis zum Rundenende. Der erste Treffer des Kampfes ist um 4 Körper niedriger.",
+    passive: "Verlässt der Gegner sein Feld, +1 Angriffswert gegen ihn bis zum Rundenende. Der erste Treffer des Kampfes ist um 2 Körper niedriger.",
     ability: "Markieren",
     abilityCost: 1,
     abilityAction: "influence",
