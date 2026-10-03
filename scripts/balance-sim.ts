@@ -59,10 +59,6 @@ interface SideMetric {
   normalDamageFraction: number;
   protectedHits: number;
   protectedDamageFraction: number;
-  normalHits: number;
-  normalDamageFraction: number;
-  protectedHits: number;
-  protectedDamageFraction: number;
   plans: number;
   energySpent: number;
   energyLevels: Record<(typeof ENERGY_LEVELS)[number], number>;
@@ -92,6 +88,10 @@ interface FighterRow {
   attacks: number;
   hits: number;
   damageFraction: number;
+  normalHits: number;
+  normalDamageFraction: number;
+  protectedHits: number;
+  protectedDamageFraction: number;
   plans: number;
   energySpent: number;
   energyLevels: Record<(typeof ENERGY_LEVELS)[number], number>;
@@ -262,6 +262,10 @@ function emptyRow(id: string): FighterRow {
     attacks: 0,
     hits: 0,
     damageFraction: 0,
+    normalHits: 0,
+    normalDamageFraction: 0,
+    protectedHits: 0,
+    protectedDamageFraction: 0,
     plans: 0,
     energySpent: 0,
     energyLevels: { "0": 0, "1": 0, "2": 0, "3": 0 },
