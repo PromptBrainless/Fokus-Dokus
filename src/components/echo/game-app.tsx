@@ -1240,6 +1240,9 @@ function GearRow({
           const on = option.id === selected || option.id === also;
           return (
             <button key={option.id} type="button" className={`panel p-3 text-left ${on ? "border-fg" : ""}`} onClick={() => onPick(option.id)}>
+              <svg className="gear-art" viewBox="0 0 128 128" aria-hidden="true">
+                <use href={`/equipment.svg#${option.id}`} />
+              </svg>
               <span className="block font-medium">{option.name}</span>
               <span className="mt-1 block text-sm text-muted line-clamp-3">{option.text}</span>
             </button>

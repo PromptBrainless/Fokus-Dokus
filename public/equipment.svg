@@ -1,0 +1,141 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="steel" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#e8e4d8" />
+      <stop offset="1" stop-color="#74827d" />
+    </linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#f3db9f" />
+      <stop offset="1" stop-color="#bb7950" />
+    </linearGradient>
+    <linearGradient id="teal" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#a6ded2" />
+      <stop offset="1" stop-color="#438b83" />
+    </linearGradient>
+    <linearGradient id="ember" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#f49a69" />
+      <stop offset="1" stop-color="#9e3d35" />
+    </linearGradient>
+  </defs>
+  <symbol id="kurzschwert" viewBox="0 0 128 128">
+    <path d="m27 91 54-62 20-11-7 22-60 53-8 14Z" fill="url(#steel)" stroke="#e8e4d8" stroke-width="4" stroke-linejoin="round"/>
+    <path d="m25 88 18 16M18 97l19 18M77 37l15 14" fill="none" stroke="url(#gold)" stroke-width="7" stroke-linecap="round"/>
+    <circle cx="22" cy="119" r="5" fill="#e16a4e"/>
+  </symbol>
+  <symbol id="hammer" viewBox="0 0 128 128">
+    <path d="m55 49 17 9-36 56-17-10Z" fill="url(#gold)" stroke="#e8e4d8" stroke-width="3" stroke-linejoin="round"/>
+    <path d="m30 21 62 4 5 36-65-4-12-17Z" fill="url(#steel)" stroke="#e8e4d8" stroke-width="4" stroke-linejoin="round"/>
+    <path d="m42 31 40 3M44 49l42 2" stroke="#66736e" stroke-width="3"/>
+    <path d="m30 104 16 10-6 8-16-9Z" fill="#e16a4e"/>
+  </symbol>
+  <symbol id="speer" viewBox="0 0 128 128">
+    <path d="m26 113 60-82 7-12 11-7-2 17-65 91Z" fill="url(#gold)" stroke="#e8e4d8" stroke-width="3" stroke-linejoin="round"/>
+    <path d="m78 39 15-20 11-7-2 17-17 22Z" fill="url(#steel)" stroke="#e8e4d8" stroke-width="3"/>
+    <path d="m28 101 13 9M37 88l12 9" stroke="#e16a4e" stroke-width="4"/>
+  </symbol>
+  <symbol id="bogen" viewBox="0 0 128 128">
+    <path d="M30 13Q104 64 30 115" fill="none" stroke="url(#gold)" stroke-width="11" stroke-linecap="round"/>
+    <path d="M30 13 98 64 30 115M31 63h75m-14-13 15 13-15 13" fill="none" stroke="url(#steel)" stroke-width="3" stroke-linejoin="round"/>
+    <path d="m23 28 12 8m-12 56 12-8" stroke="#e16a4e" stroke-width="5" stroke-linecap="round"/>
+  </symbol>
+  <symbol id="kette" viewBox="0 0 128 128">
+    <path d="M25 24c-13 0-13 20 0 20h16c13 0 13-20 0-20H25Zm22 31c-13 0-13 20 0 20h16c13 0 13-20 0-20H47Zm22 31c-13 0-13 20 0 20h16c13 0 13-20 0-20H69Z" fill="none" stroke="url(#gold)" stroke-width="6"/>
+    <path d="m84 21 21 16-8 36-14-11 8-22-18-8Z" fill="url(#steel)" stroke="#e8e4d8" stroke-width="3" stroke-linejoin="round"/>
+    <path d="m91 25 12 10" stroke="#e16a4e" stroke-width="4"/>
+  </symbol>
+  <symbol id="leder" viewBox="0 0 128 128">
+    <path d="m47 16 17 12 17-12 25 19-11 24-8-6v58H41V53l-8 6-11-24Z" fill="#745342" stroke="url(#gold)" stroke-width="4" stroke-linejoin="round"/>
+    <path d="M48 20q16 22 32 0M64 31v78M45 56h38" fill="none" stroke="#d0a16e" stroke-width="4"/>
+    <path d="m53 47 11 8 11-8-4 18-7 8-7-8Z" fill="url(#teal)" stroke="#e8e4d8" stroke-width="2"/>
+  </symbol>
+  <symbol id="ketten" viewBox="0 0 128 128">
+    <path d="m47 15 17 13 17-13 25 20-12 24-8-6v58H42V53l-9 6-11-24Z" fill="#303b39" stroke="url(#steel)" stroke-width="4" stroke-linejoin="round"/>
+    <path d="M47 29h34M42 43h52M42 58h52M42 73h52M42 88h52M42 103h52" stroke="url(#gold)" stroke-width="3"/>
+    <path d="m64 40 11 14-11 14-11-14Z" fill="url(#teal)" stroke="#e8e4d8" stroke-width="2"/>
+  </symbol>
+  <symbol id="platte" viewBox="0 0 128 128">
+    <path d="m47 14 17 13 17-13 27 20-12 25-9-6v59H41V53l-9 6-12-25Z" fill="url(#steel)" stroke="#e8e4d8" stroke-width="4" stroke-linejoin="round"/>
+    <path d="m47 22 17 12 17-12 10 14-11 15H48L37 36Zm-1 42h36v24H46Z" fill="#485652" stroke="url(#gold)" stroke-width="3"/>
+    <path d="m64 41 11 11-11 12-11-12Z" fill="url(#ember)" stroke="#f3db9f" stroke-width="2"/>
+  </symbol>
+  <symbol id="spiegel" viewBox="0 0 128 128">
+    <path d="m47 15 17 12 17-12 25 19-11 24-9-6v58H42V52l-9 6-11-24Z" fill="#28504d" stroke="url(#teal)" stroke-width="4" stroke-linejoin="round"/>
+    <path d="M47 23q17 15 34 0l8 14-11 15H50L39 37Z" fill="url(#steel)" stroke="#e8e4d8" stroke-width="3"/>
+    <path d="m64 40 10 12-10 12-10-12Zm0 34 14 17H50Z" fill="url(#gold)" stroke="#e8e4d8" stroke-width="2"/>
+  </symbol>
+  <symbol id="greifhaken" viewBox="0 0 128 128">
+    <path d="M29 24c0-16 26-16 26 0v15c0 16-26 16-26 0V24Zm23 28c0-16 26-16 26 0v15c0 16-26 16-26 0V52Zm23 28c0-16 26-16 26 0v14c0 16-26 16-26 0V80Z" fill="none" stroke="url(#steel)" stroke-width="7"/>
+    <path d="m78 20 29 8-18 20-3-13-13-3Z" fill="url(#gold)" stroke="#e8e4d8" stroke-width="3" stroke-linejoin="round"/>
+    <path d="m88 35 16-7" stroke="#e16a4e" stroke-width="4"/>
+  </symbol>
+  <symbol id="rauch" viewBox="0 0 128 128">
+    <path d="M40 48h48l8 59H32Z" fill="#4e7470" stroke="url(#teal)" stroke-width="4" stroke-linejoin="round"/>
+    <path d="M44 48V29h40v19M50 29V17h28v12" fill="#d0a16e" stroke="url(#gold)" stroke-width="4" stroke-linejoin="round"/>
+    <path d="M40 79c9-13 17 13 26 0s17 13 26 0" fill="none" stroke="#e8e4d8" stroke-width="4" stroke-linecap="round"/>
+    <path d="M49 97h30" stroke="#e16a4e" stroke-width="4" stroke-linecap="round"/>
+  </symbol>
+  <symbol id="brecheisen" viewBox="0 0 128 128">
+    <path d="m30 110 12 8 48-76-12-8Z" fill="url(#steel)" stroke="#e8e4d8" stroke-width="3"/>
+    <path d="m75 45-14-9 16-25 14 9 17 24-9 8-15-14Z" fill="url(#gold)" stroke="#e8e4d8" stroke-width="4" stroke-linejoin="round"/>
+    <path d="m28 105 19 12-8 9-18-12Z" fill="#e16a4e"/>
+    <circle cx="81" cy="30" r="4" fill="#29312e"/>
+  </symbol>
+  <symbol id="anker" viewBox="0 0 128 128">
+    <circle cx="64" cy="27" r="11" fill="none" stroke="url(#gold)" stroke-width="7"/>
+    <path d="M64 40v67M32 63h64M64 57 35 88q29 35 58 0L64 57Z" fill="none" stroke="url(#steel)" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="m31 63-12-1m78 1 12-1" stroke="#e16a4e" stroke-width="5" stroke-linecap="round"/>
+  </symbol>
+  <symbol id="spiegelkern" viewBox="0 0 128 128">
+    <path d="m64 10 43 27v54l-43 27-43-27V37Z" fill="#24524e" stroke="url(#teal)" stroke-width="5" stroke-linejoin="round"/>
+    <path d="m64 29 25 16v32l-25 16-25-16V45Z" fill="url(#steel)" stroke="#e8e4d8" stroke-width="3" stroke-linejoin="round"/>
+    <path d="m64 42 12 22-12 22-12-22Z" fill="url(#gold)" stroke="#fff1c9" stroke-width="3"/>
+    <circle cx="64" cy="64" r="5" fill="#e16a4e"/>
+  </symbol>
+  <symbol id="zeitnadel" viewBox="0 0 128 128">
+    <circle cx="64" cy="64" r="39" fill="#27312e" stroke="url(#gold)" stroke-width="6"/>
+    <circle cx="64" cy="64" r="29" fill="none" stroke="#a7b3ab" stroke-width="2" stroke-dasharray="2 8"/>
+    <path d="M64 20V9m0 110v-11M20 64H9m110 0h-11" stroke="#e8e4d8" stroke-width="4" stroke-linecap="round"/>
+    <path d="m64 64 2-27m-2 27 22 13" fill="none" stroke="url(#ember)" stroke-width="6" stroke-linecap="round"/>
+    <circle cx="64" cy="64" r="5" fill="#e8e4d8"/>
+  </symbol>
+  <symbol id="bruchstein" viewBox="0 0 128 128">
+    <path d="m64 12 15 13 23-2 5 25 12 16-15 19-4 24-26 1-18 9-16-19-22-9 6-25-7-21 21-13Z" fill="#464947" stroke="url(#steel)" stroke-width="5" stroke-linejoin="round"/>
+    <path d="m69 22-13 34 17 5-20 43 6-35-17-5Z" fill="url(#ember)" stroke="#f3db9f" stroke-width="3" stroke-linejoin="round"/>
+    <circle cx="93" cy="36" r="5" fill="#e8c98d"/>
+  </symbol>
+  <symbol id="maske" viewBox="0 0 128 128">
+    <path d="M26 31 64 17l38 14-5 45-33 37-33-37Z" fill="#394541" stroke="url(#steel)" stroke-width="4" stroke-linejoin="round"/>
+    <path d="M38 49q13-12 26 0-13 15-26 0Zm26 0q13-12 26 0-13 15-26 0Z" fill="url(#teal)" stroke="#e8e4d8" stroke-width="2"/>
+    <path d="m64 55-8 22 8 8 8-8Zm-15 33 15 16 15-16" fill="none" stroke="url(#gold)" stroke-width="4" stroke-linejoin="round"/>
+    <path d="m27 39-9 9m83-9 9 9" stroke="#e16a4e" stroke-width="4" stroke-linecap="round"/>
+  </symbol>
+  <symbol id="heil" viewBox="0 0 128 128">
+    <path d="M48 17h32v21l13 16v55H35V54l13-16Z" fill="#613d3b" stroke="url(#ember)" stroke-width="4" stroke-linejoin="round"/>
+    <path d="M48 17h32v15H48Z" fill="url(#gold)" stroke="#e8e4d8" stroke-width="3"/>
+    <path d="M64 53v37m-18-18h36" stroke="#f1eee5" stroke-width="10" stroke-linecap="round"/>
+    <path d="M43 102h42" stroke="#e8c98d" stroke-width="3"/>
+  </symbol>
+  <symbol id="zelle" viewBox="0 0 128 128">
+    <path d="M45 16h38v13H45Zm-8 13h54l8 80H29Z" fill="#33433f" stroke="url(#teal)" stroke-width="4" stroke-linejoin="round"/>
+    <path d="m67 35-20 36h16l-5 24 26-39H68Z" fill="url(#gold)" stroke="#fff1c9" stroke-width="2" stroke-linejoin="round"/>
+    <path d="M38 104h52" stroke="#e16a4e" stroke-width="4"/>
+  </symbol>
+  <symbol id="binde" viewBox="0 0 128 128">
+    <path d="M36 23h56v82H36Z" fill="#755d49" stroke="url(#gold)" stroke-width="4"/>
+    <path d="m43 32 42 10-42 11 42 11-42 11 42 11-42 11" fill="none" stroke="#e8e4d8" stroke-width="8" stroke-linejoin="round"/>
+    <path d="M62 44h5v39h-5z" fill="#e16a4e"/>
+    <path d="m64 53 9 10-9 10-9-10Z" fill="url(#teal)" stroke="#f1eee5" stroke-width="2"/>
+  </symbol>
+  <symbol id="splitter" viewBox="0 0 128 128">
+    <path d="m64 12 31 42-31 62-31-62Z" fill="#28524e" stroke="url(#teal)" stroke-width="5" stroke-linejoin="round"/>
+    <path d="m64 20 4 43-4 43-24-51Zm0 43 24-9-24 44Z" fill="url(#steel)" stroke="#e8e4d8" stroke-width="2" stroke-linejoin="round"/>
+    <path d="m64 41 10 22-10 21-10-21Z" fill="url(#ember)" stroke="#f3db9f" stroke-width="3"/>
+    <path d="m28 36-9-8m90 8 9-8" stroke="#e8c98d" stroke-width="4" stroke-linecap="round"/>
+  </symbol>
+  <symbol id="blend" viewBox="0 0 128 128">
+    <path d="m28 53 36-26 36 26-9 54H37Z" fill="#383c39" stroke="url(#steel)" stroke-width="4" stroke-linejoin="round"/>
+    <path d="M45 27V16h38v11M39 58h50" fill="none" stroke="url(#gold)" stroke-width="5" stroke-linejoin="round"/>
+    <path d="M49 87c-7-9 7-12 0-21m15 25c-7-9 7-12 0-21m15 17c-7-9 7-12 0-21" fill="none" stroke="url(#teal)" stroke-width="5" stroke-linecap="round"/>
+    <path d="m64 64 6 7-6 7-6-7Z" fill="#e16a4e"/>
+  </symbol>
+</svg>
