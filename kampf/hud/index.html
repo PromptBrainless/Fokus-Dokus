@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kampf — Wächter gegen Jäger</title>
+<style>
+  :root {
+    --ink: #e8dcc4;
+    --dim: #a89880;
+    --line: rgba(232, 220, 196, 0.35);
+    --body: #9c2b24;
+    --body-hi: #d4543c;
+    --bruch: #c4842a;
+    --bruch-hi: #e2b15a;
+    --energie: #3d6f8c;
+    --energie-hi: #7eb0c8;
+    --bad: #c4483a;
+    --good: #7ea36a;
+    --panel: rgba(12, 10, 8, 0.72);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: #070605; color: var(--ink); font-family: "Palatino Linotype", Palatino, Georgia, serif; }
+  button, .pip, .log { font-family: inherit; }
+  #stage { position: relative; width: 100%; height: 100%; overflow: hidden; background: #000; }
+  #view { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  #shade { position: absolute; inset: 0; pointer-events: none; background:
+    radial-gradient(ellipse at center, transparent 42%, rgba(0,0,0,0.55) 100%),
+    linear-gradient(to top, rgba(0,0,0,0.72), transparent 28%); }
+  .plate { position: absolute; z-index: 2; min-width: 240px; padding: 10px 14px 12px; background: var(--panel); border: 1px solid var(--line); }
+  .plate.left { top: 18px; left: 18px; }
+  .plate.right { top: 18px; right: 18px; text-align: right; }
+  .who { font-size: 13px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--dim); }
+  .name { font-size: 22px; margin: 2px 0 8px; }
+  .row { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
+  .plate.right .row { flex-direction: row-reverse; }
+  .tag { width: 62px; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--dim); }
+  .bar { flex: 1; height: 8px; background: rgba(255,255,255,0.08); border: 1px solid var(--line); }
+  .fill { height: 100%; width: 0; transition: width 0.35s ease; }
+  .fill.body { background: linear-gradient(90deg, var(--body), var(--body-hi)); }
+  .fill.bruch { background: linear-gradient(90deg, var(--bruch), var(--bruch-hi)); }
+  .pips { display: flex; gap: 4px; }
+  .pip { width: 14px; height: 14px; border: 1px solid var(--energie-hi); background: transparent; }
+  .pip.on { background: var(--energie-hi); }
+  #round { position: absolute; z-index: 2; top: 18px; left: 50%; transform: translateX(-50%); padding: 6px 16px; background: var(--panel); border: 1px solid var(--line); letter-spacing: 0.22em; text-transform: uppercase; font-size: 13px; }
+  #banner { position: absolute; z-index: 2; left: 50%; bottom: 108px; transform: translateX(-50%); min-width: 280px; text-align: center; padding: 10px 22px 12px; background: var(--panel); border: 1px solid var(--line); }
+  #banner b { display: block; font-size: 26px; font-weight: normal; letter-spacing: 0.04em; }
+  #banner span { color: var(--dim); font-size: 14px; }
+  #dice { position: absolute; z-index: 2; right: 18px; bottom: 108px; width: 72px; height: 72px; display: grid; place-items: center; background: var(--panel); border: 1px solid var(--line); font-size: 32px; }
+  #log { position: absolute; z-index: 2; left: 18px; bottom: 18px; width: min(460px, 46vw); padding: 8px 12px; background: var(--panel); border: 1px solid var(--line); font-size: 14px; line-height: 1.45; }
+  #log div { color: var(--dim); }
+  #log div:last-child { color: var(--ink); }
+  #controls { position: absolute; z-index: 3; right: 18px; bottom: 18px; display: flex; gap: 8px; }
+  button { background: var(--panel); color: var(--ink); border: 1px solid var(--line); padding: 8px 12px; cursor: pointer; }
+  button:hover { border-color: var(--ink); }
+  .hit { color: var(--bad); }
+  .hold { color: var(--good); }
+</style>
+</head>
+<body>
+<div id="stage">
+  <img id="view" alt="">
+  <div id="shade"></div>
+  <div class="plate left">
+    <div class="who">Du</div>
+    <div class="name" id="p-name">Wächter</div>
+    <div class="row"><span class="tag">Körper</span><div class="bar"><div class="fill body" id="p-body"></div></div></div>
+    <div class="row"><span class="tag">Bruch</span><div class="bar"><div class="fill bruch" id="p-bruch"></div></div></div>
+    <div class="row"><span class="tag">Energie</span><div class="pips" id="p-en"></div></div>
+  </div>
+  <div class="plate right">
+    <div class="who">Gegenüber</div>
+    <div class="name" id="f-name">Jäger</div>
+    <div class="row"><span class="tag">Körper</span><div class="bar"><div class="fill body" id="f-body"></div></div></div>
+    <div class="row"><span class="tag">Bruch</span><div class="bar"><div class="fill bruch" id="f-bruch"></div></div></div>
+    <div class="row"><span class="tag">Energie</span><div class="pips" id="f-en"></div></div>
+  </div>
+  <div id="round">Runde 1</div>
+  <div id="banner"><b id="banner-title">Gegenüber</b><span id="banner-note"></span></div>
+  <div id="dice">–</div>
+  <div id="log"></div>
+  <div id="controls">
+    <button type="button" id="prev">Zurück</button>
+    <button type="button" id="play">Lauf</button>
+    <button type="button" id="next">Weiter</button>
+  </div>
+</div>
+<script>
+/* Übernahme: KampfHud.set(zustand) setzt Platte, Balken, Würfel, Zeile.
+   Zustand: { plate, title, note, dice, round, log, player:{name,koerper,bruch,energie}, foe:{...} }
+   Körper und Bruch sind 0..8, Energie 0..6. Platte ist ein Dateiname in platten/. */
+const MAX = { koerper: 8, bruch: 8, energie: 6 };
+const BEATS = [
+  { plate: "01_gegenueber.jpg", title: "Gegenüber", note: "Der Jäger steht im Gang.", dice: null, round: 1, log: "Wächter und Jäger stehen sich gegenüber.", player: { name: "Wächter", koerper: 8, bruch: 0, energie: 4 }, foe: { name: "Jäger", koerper: 8, bruch: 0, energie: 4 } },
+  { plate: "02_ausholen.jpg", title: "Ausholen", note: "Deine Klinge geht zurück.", dice: null, round: 1, log: "Wächter holt aus.", player: { name: "Wächter", koerper: 8, bruch: 0, energie: 4 }, foe: { name: "Jäger", koerper: 8, bruch: 0, energie: 4 } },
+  { plate: "03_anlegen.jpg", title: "Anlegen", note: "Er spannt den Bogen.", dice: null, round: 1, log: "Jäger legt an.", player: { name: "Wächter", koerper: 8, bruch: 0, energie: 4 }, foe: { name: "Jäger", koerper: 8, bruch: 0, energie: 4 } },
+  { plate: "04_verfehlen.jpg", title: "Verfehlen", note: "Würfel 1. Angriff 2 gegen Verteidigung 4.", dice: 1, round: 1, log: "Wächter verfehlt den Jäger.", player: { name: "Wächter", koerper: 8, bruch: 0, energie: 4 }, foe: { name: "Jäger", koerper: 8, bruch: 0, energie: 4 } },
+  { plate: "05_schutz.jpg", title: "Schutz", note: "Roh 2, nach Schutzbonus 1. 0 Körper.", dice: 3, round: 2, log: "Der Hieb gleitet am Leder ab.", player: { name: "Wächter", koerper: 8, bruch: 0, energie: 5 }, foe: { name: "Jäger", koerper: 8, bruch: 0, energie: 6 } },
+  { plate: "06_koerper.jpg", title: "Körper", note: "1 Körper, 0 Bruch.", dice: 4, round: 2, log: "Wächter trifft den Jäger. 1 Körper.", player: { name: "Wächter", koerper: 8, bruch: 0, energie: 5 }, foe: { name: "Jäger", koerper: 7, bruch: 0, energie: 6 } },
+  { plate: "07_bruch.jpg", title: "Bruch", note: "3 Körper, 2 Bruch.", dice: 5, round: 3, log: "Der Jäger geht in die Knie. 2 Bruch.", player: { name: "Wächter", koerper: 8, bruch: 0, energie: 6 }, foe: { name: "Jäger", koerper: 4, bruch: 2, energie: 4 } },
+  { plate: "08_block.jpg", title: "Block", note: "Block −4. 0 Körper, 0 Bruch.", dice: 3, round: 4, log: "Jäger blockt. Der erste Treffer ist um 4 niedriger.", player: { name: "Wächter", koerper: 7, bruch: 1, energie: 5 }, foe: { name: "Jäger", koerper: 4, bruch: 2, energie: 3 } },
+  { plate: "09_ausweichen.jpg", title: "Ausweichen", note: "Ausweichen −2. Der Hieb verpufft.", dice: 2, round: 5, log: "Jäger weicht aus. Kostet 2 Energie.", player: { name: "Wächter", koerper: 7, bruch: 1, energie: 6 }, foe: { name: "Jäger", koerper: 4, bruch: 2, energie: 1 } },
+  { plate: "10_offen.jpg", title: "Offen", note: "Offen +1. Die Deckung ist weg.", dice: 4, round: 6, log: "Der Jäger ist offen. Nächster Treffer +1.", player: { name: "Wächter", koerper: 6, bruch: 2, energie: 5 }, foe: { name: "Jäger", koerper: 4, bruch: 2, energie: 3 } },
+  { plate: "11_schuss.jpg", title: "Schuss", note: "Angriff 6 gegen Verteidigung 5. 2 Körper, 1 Bruch.", dice: 5, round: 7, log: "Jäger schießt. Wächter nimmt 2 Körper, 1 Bruch.", player: { name: "Wächter", koerper: 4, bruch: 3, energie: 4 }, foe: { name: "Jäger", koerper: 4, bruch: 2, energie: 2 } },
+  { plate: "11b_schuss_aus_der_drehung.jpg", title: "Gegentreffer", note: "Zweiter Schuss aus der Drehung.", dice: 4, round: 8, log: "Jäger schießt aus der Drehung.", player: { name: "Wächter", koerper: 2, bruch: 5, energie: 3 }, foe: { name: "Jäger", koerper: 4, bruch: 2, energie: 1 } },
+  { plate: "12_energie.jpg", title: "Energie", note: "Runde endet. Jäger +2, Wächter +1.", dice: null, round: 9, log: "Die Runde endet. Energie kehrt zurück.", player: { name: "Wächter", koerper: 2, bruch: 5, energie: 4 }, foe: { name: "Jäger", koerper: 4, bruch: 2, energie: 3 } },
+  { plate: "13_zusammenbruch.jpg", title: "Zusammenbruch", note: "Wächter bricht zusammen.", dice: null, round: 10, log: "Wächter bricht zusammen.", player: { name: "Wächter", koerper: 0, bruch: 8, energie: 0 }, foe: { name: "Jäger", koerper: 4, bruch: 2, energie: 3 } }
+];
+
+const view = document.getElementById("view");
+const logEl = document.getElementById("log");
+let index = 0;
+let timer = null;
+const lines = [];
+
+function pips(el, n) {
+  el.innerHTML = "";
+  for (let i = 0; i < MAX.energie; i++) {
+    const d = document.createElement("i");
+    d.className = "pip" + (i < n ? " on" : "");
+    el.appendChild(d);
+  }
+}
+function set(state) {
+  view.src = "platten/" + state.plate;
+  document.getElementById("p-name").textContent = state.player.name;
+  document.getElementById("f-name").textContent = state.foe.name;
+  document.getElementById("p-body").style.width = (state.player.koerper / MAX.koerper * 100) + "%";
+  document.getElementById("p-bruch").style.width = (state.player.bruch / MAX.bruch * 100) + "%";
+  document.getElementById("f-body").style.width = (state.foe.koerper / MAX.koerper * 100) + "%";
+  document.getElementById("f-bruch").style.width = (state.foe.bruch / MAX.bruch * 100) + "%";
+  pips(document.getElementById("p-en"), state.player.energie);
+  pips(document.getElementById("f-en"), state.foe.energie);
+  document.getElementById("round").textContent = "Runde " + state.round;
+  document.getElementById("banner-title").textContent = state.title;
+  document.getElementById("banner-note").textContent = state.note;
+  document.getElementById("dice").textContent = state.dice == null ? "–" : state.dice;
+  if (state.log) {
+    lines.push(state.log);
+    if (lines.length > 3) lines.shift();
+    logEl.innerHTML = lines.map(t => "<div>" + t + "</div>").join("");
+  }
+}
+function show(i) {
+  index = (i + BEATS.length) % BEATS.length;
+  set(BEATS[index]);
+}
+document.getElementById("next").onclick = () => show(index + 1);
+document.getElementById("prev").onclick = () => show(index - 1);
+document.getElementById("play").onclick = () => {
+  if (timer) { clearInterval(timer); timer = null; document.getElementById("play").textContent = "Lauf"; return; }
+  document.getElementById("play").textContent = "Halt";
+  timer = setInterval(() => show(index + 1), 2000);
+};
+window.KampfHud = { set, beats: BEATS, show };
+show(0);
+</script>
+</body>
+</html>
