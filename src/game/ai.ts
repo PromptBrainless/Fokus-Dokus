@@ -20,7 +20,12 @@ function bestPattern(state: GameState, side: Side): ActionKind | null {
 }
 
 function energyCost(energy: number, difficulty: Difficulty): number {
-  const costs = difficulty === "bedacht" ? [0, 3, 6, 10] : difficulty === "brutal" ? [0, 1, 3, 6] : [0, 2, 4, 7];
+  const costs =
+    difficulty === "bedacht"
+      ? [0, 5, 10, 17]
+      : difficulty === "brutal"
+        ? [0, 2, 5, 9]
+        : [0, 4, 9, 16];
   return costs[Math.min(3, energy)];
 }
 
@@ -153,7 +158,10 @@ export function choosePlan(state: GameState, side: Side, difficulty: Difficulty)
       if (plan.energy >= 1) score += 2;
       if (plan.energy >= 2) score += 2;
       if (plan.influence === "kern") {
-        score += foe.cores.some((core) => core.revealed && core.points > 0) ? 8 : 4;
+        const cores = foe.cores.filter((core) => core.points > 0);
+        const revealed = cores.some((core) => core.revealed);
+        score += revealed ? 20 : 15;
+        if (plan.energy === 3 && cores.some((core) => core.points === 2)) score += 8;
       }
       if (plan.influence === "convert") score += 5;
       if (plan.influence === "weaken") score += 3;

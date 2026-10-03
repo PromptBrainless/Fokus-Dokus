@@ -359,7 +359,7 @@ export const SUGGESTED: Record<
   archivar: {
     weaponId: "kette",
     armorId: "spiegel",
-    toolId: "rauch",
+    toolId: "brecheisen",
     artifactId: "spiegelkern",
     items: ["splitter", "zelle"],
   },

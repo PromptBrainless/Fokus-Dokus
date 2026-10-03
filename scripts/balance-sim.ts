@@ -55,6 +55,14 @@ interface SideMetric {
   attacks: number;
   hits: number;
   damageFraction: number;
+  normalHits: number;
+  normalDamageFraction: number;
+  protectedHits: number;
+  protectedDamageFraction: number;
+  normalHits: number;
+  normalDamageFraction: number;
+  protectedHits: number;
+  protectedDamageFraction: number;
   plans: number;
   energySpent: number;
   energyLevels: Record<(typeof ENERGY_LEVELS)[number], number>;
@@ -65,6 +73,7 @@ interface Bout {
   right: string;
   seed: number;
   ruleStage: RuleStage;
+  startSide: Side;
   rounds: number;
   winner: Side | null;
   reason: string | null;
@@ -109,6 +118,14 @@ function emptySideMetric(): SideMetric {
     attacks: 0,
     hits: 0,
     damageFraction: 0,
+    normalHits: 0,
+    normalDamageFraction: 0,
+    protectedHits: 0,
+    protectedDamageFraction: 0,
+    normalHits: 0,
+    normalDamageFraction: 0,
+    protectedHits: 0,
+    protectedDamageFraction: 0,
     plans: 0,
     energySpent: 0,
     energyLevels: { "0": 0, "1": 0, "2": 0, "3": 0 },
@@ -165,6 +182,7 @@ function play(left: string, right: string, seed: number, ruleStage: RuleStage): 
       ruleStage,
     );
     state.startSide = seed % 2 === 0 ? "B" : "A";
+    const startSide = state.startSide;
     state = beginRound(state).state;
     const sides: Record<Side, SideMetric> = { A: emptySideMetric(), B: emptySideMetric() };
     let rounds = 0;
@@ -195,10 +213,17 @@ function play(left: string, right: string, seed: number, ruleStage: RuleStage): 
             if (frame.tone === "hit") {
               metric.hits += 1;
               const targetSide = other(frame.actor);
-              metric.damageFraction += Math.max(
-                0,
-                previous.fighters[targetSide].body - frame.state.fighters[targetSide].body,
-              ) / frame.state.fighters[targetSide].bodyMax;
+              const targetMax = previous.fighters[targetSide].bodyMax;
+              const hitLine = frame.state.log.find((line) => line.includes(" trifft "));
+              const endDamage = Number(hitLine?.match(/Endschaden (\d+)/)?.[1] ?? 0);
+              metric.damageFraction += endDamage / targetMax;
+              if (hitLine?.includes("; Geschützt")) {
+                metric.protectedHits += 1;
+                metric.protectedDamageFraction += endDamage / targetMax;
+              } else {
+                metric.normalHits += 1;
+                metric.normalDamageFraction += endDamage / targetMax;
+              }
             }
           }
         }
@@ -213,6 +238,7 @@ function play(left: string, right: string, seed: number, ruleStage: RuleStage): 
       right,
       seed,
       ruleStage,
+      startSide,
       rounds: state.round,
       winner: state.winner,
       reason: state.winReason,
@@ -245,18 +271,31 @@ function emptyRow(id: string): FighterRow {
 
 function summarize(ruleStage: RuleStage, bouts: Bout[]) {
   const rows = new Map(IDS.map((id) => [id, emptyRow(id)]));
-  const matrix = new Map<string, { games: number; wins: number; draws: number }>();
+  const matrix = new Map<string, { games: number; wins: number; draws: number; attacks: number; hits: number }>();
   const coverage = Object.fromEntries(MECHANICS.map((mechanic) => [mechanic, 0])) as Record<MetricKey, number>;
   const durations: number[] = [];
+  const mirrorStarts = new Map<string, { A: { games: number; wins: number }; B: { games: number; wins: number } }>();
 
   for (const bout of bouts) {
     durations.push(bout.rounds);
     const pairKey = `${bout.left}>${bout.right}`;
-    const pair = matrix.get(pairKey) ?? { games: 0, wins: 0, draws: 0 };
+    const pair = matrix.get(pairKey) ?? { games: 0, wins: 0, draws: 0, attacks: 0, hits: 0 };
     pair.games += 1;
     if (bout.winner === "A") pair.wins += 1;
     if (!bout.winner) pair.draws += 1;
+    pair.attacks += bout.sides.A.attacks;
+    pair.hits += bout.sides.A.hits;
     matrix.set(pairKey, pair);
+    if (bout.left === bout.right) {
+      const starts = mirrorStarts.get(bout.left) ?? {
+        A: { games: 0, wins: 0 },
+        B: { games: 0, wins: 0 },
+      };
+      const startStats = starts[bout.startSide];
+      startStats.games += 1;
+      if (bout.winner === bout.startSide) startStats.wins += 1;
+      mirrorStarts.set(bout.left, starts);
+    }
     for (const mechanic of bout.mechanics) coverage[mechanic] += 1;
 
     for (const side of ["A", "B"] as Side[]) {
@@ -268,6 +307,10 @@ function summarize(ruleStage: RuleStage, bouts: Bout[]) {
       row.attacks += metric.attacks;
       row.hits += metric.hits;
       row.damageFraction += metric.damageFraction;
+      row.normalHits += metric.normalHits;
+      row.normalDamageFraction += metric.normalDamageFraction;
+      row.protectedHits += metric.protectedHits;
+      row.protectedDamageFraction += metric.protectedDamageFraction;
       row.plans += metric.plans;
       row.energySpent += metric.energySpent;
       for (const action of Object.keys(row.actions) as ActionKind[]) row.actions[action] += metric.actions[action];
@@ -298,6 +341,8 @@ function summarize(ruleStage: RuleStage, bouts: Bout[]) {
       ),
       attackHitRate: row.attacks ? row.hits / row.attacks : 0,
       meanHitDamageOfBody: row.hits ? row.damageFraction / row.hits : 0,
+      meanUnprotectedHitDamageOfBody: row.normalHits ? row.normalDamageFraction / row.normalHits : 0,
+      meanProtectedHitDamageOfBody: row.protectedHits ? row.protectedDamageFraction / row.protectedHits : 0,
       meanEnergyPerPlan: row.plans ? row.energySpent / row.plans : 0,
       energyShares: Object.fromEntries(
         ENERGY_LEVELS.map((energy) => [energy, row.energyLevels[energy] / row.plans]),
@@ -311,9 +356,22 @@ function summarize(ruleStage: RuleStage, bouts: Bout[]) {
     duelCount: bouts.length,
     meanRounds: durations.reduce((sum, value) => sum + value, 0) / totalDuelCount,
     p90Rounds: durations[Math.min(durations.length - 1, Math.ceil(durations.length * 0.9) - 1)] ?? 0,
+    betweenThreeAndTwelveRoundsRate: bouts.filter((bout) => bout.rounds >= 3 && bout.rounds <= 12).length / totalDuelCount,
     timeLimitDrawRate: bouts.filter((bout) => bout.reason === "Zeit").length / totalDuelCount,
     fighters,
     matrix: Object.fromEntries(matrix),
+    mirrorStarts: Object.fromEntries(
+      [...mirrorStarts].map(([id, starts]) => [
+        id,
+        {
+          sideAWinRate: starts.A.games ? starts.A.wins / starts.A.games : 0,
+          sideBWinRate: starts.B.games ? starts.B.wins / starts.B.games : 0,
+          difference: starts.A.games && starts.B.games
+            ? Math.abs(starts.A.wins / starts.A.games - starts.B.wins / starts.B.games)
+            : null,
+        },
+      ]),
+    ),
     mechanics: Object.fromEntries(
       MECHANICS.map((mechanic) => [mechanic, { duels: coverage[mechanic], rate: coverage[mechanic] / totalDuelCount }]),
     ),
@@ -350,12 +408,12 @@ const lines = [
 
 for (const result of results) {
   lines.push("", `=== Regelstufe ${result.ruleStage} ===`);
-  lines.push(`Duelle: ${result.duelCount} · Ø Runden: ${result.meanRounds.toFixed(2)} · P90: ${result.p90Rounds} · Zeit-Unentschieden: ${(result.timeLimitDrawRate * 100).toFixed(2)}%`);
-  lines.push("Figur | Siege | Quote | Ø Runden | Trefferquote | Schaden/Körper pro Treffer | Ø Energie | Angriff | Schutz | Bewegung | Einfluss");
+  lines.push(`Duelle: ${result.duelCount} · Ø Runden: ${result.meanRounds.toFixed(2)} · P90: ${result.p90Rounds} · 3–12 Runden: ${(result.betweenThreeAndTwelveRoundsRate * 100).toFixed(1)}% · Zeit-Unentschieden: ${(result.timeLimitDrawRate * 100).toFixed(2)}%`);
+  lines.push("Figur | Siege | Quote | Ø Runden | Trefferquote | ungeschützte Treffer/Körper | geschützte Treffer/Körper | Ø Energie | Angriff | Schutz | Bewegung | Einfluss");
   for (const fighter of result.fighters) {
     const actions = fighter.actionShare;
     lines.push(
-      `${fighter.name} | ${fighter.wins}/${fighter.games} | ${(fighter.winRate * 100).toFixed(1)}% | ${fighter.meanRounds.toFixed(2)} | ${(fighter.attackHitRate * 100).toFixed(1)}% | ${(fighter.meanHitDamageOfBody * 100).toFixed(1)}% | ${fighter.meanEnergyPerPlan.toFixed(2)} | ${(actions.attack * 100).toFixed(1)}% | ${(actions.guard * 100).toFixed(1)}% | ${(actions.move * 100).toFixed(1)}% | ${(actions.influence * 100).toFixed(1)}%`,
+      `${fighter.name} | ${fighter.wins}/${fighter.games} | ${(fighter.winRate * 100).toFixed(1)}% | ${fighter.meanRounds.toFixed(2)} | ${(fighter.attackHitRate * 100).toFixed(1)}% | ${(fighter.meanUnprotectedHitDamageOfBody * 100).toFixed(1)}% | ${(fighter.meanProtectedHitDamageOfBody * 100).toFixed(1)}% | ${fighter.meanEnergyPerPlan.toFixed(2)} | ${(actions.attack * 100).toFixed(1)}% | ${(actions.guard * 100).toFixed(1)}% | ${(actions.move * 100).toFixed(1)}% | ${(actions.influence * 100).toFixed(1)}%`,
     );
   }
   lines.push("", "Paarungsmatrix · Siege der Zeilenfigur / Duelle (geordnete Aufstellung)");
@@ -366,6 +424,23 @@ for (const result of results) {
         const cell = result.matrix[`${left}>${right}`];
         return `${cell.wins}/${cell.games}${cell.draws ? ` (${cell.draws})` : ""}`;
       })].join(" | "),
+    );
+  }
+  lines.push("", "Trefferquote je geordneter Paarung");
+  lines.push(["", ...IDS.map((id) => NAMES[id])].join(" | "));
+  for (const left of IDS) {
+    lines.push(
+      [NAMES[left], ...IDS.map((right) => {
+        const cell = result.matrix[`${left}>${right}`];
+        return cell.attacks ? `${((cell.hits / cell.attacks) * 100).toFixed(1)}%` : "–";
+      })].join(" | "),
+    );
+  }
+  lines.push("", "Startspielervorteil in Spiegelduellen · Siegquoten A-Start / B-Start");
+  for (const id of IDS) {
+    const starts = result.mirrorStarts[id];
+    lines.push(
+      `${NAMES[id]} | ${(starts.sideAWinRate * 100).toFixed(1)}% / ${(starts.sideBWinRate * 100).toFixed(1)}% | Unterschied ${starts.difference == null ? "—" : `${(starts.difference * 100).toFixed(1)} Prozentpunkte`}`,
     );
   }
   lines.push("", "Energieverteilung je Figur (Planungen 0 / 1 / 2 / 3)");
