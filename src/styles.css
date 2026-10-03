@@ -571,3 +571,35 @@
     transition: none;
   }
 }
+
+
+.figure-well {
+  position: relative;
+  display: grid;
+  height: 168px;
+  place-items: end center;
+  overflow: hidden;
+  border-radius: 12px;
+  background:
+    radial-gradient(ellipse at 50% 88%, rgba(232, 220, 196, 0.16), transparent 58%),
+    #0c0b0a;
+}
+.figure-well .figure-cut {
+  height: 158px;
+  width: auto;
+  max-width: 100%;
+  object-fit: contain;
+  object-position: center bottom;
+}
+.figure-well svg {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  height: 22px;
+  width: 22px;
+}
+.figure-well-kit {
+  width: 132px;
+  height: 168px;
+  flex: none;
+}

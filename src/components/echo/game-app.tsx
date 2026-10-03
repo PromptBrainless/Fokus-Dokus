@@ -547,7 +547,10 @@ function Roster({ duel, dispatch }: { duel: Duel; dispatch: (act: Act) => void }
               onClick={() => dispatch({ type: "character", id: c.id })}
               className={`panel flex flex-col gap-3 p-4 text-left ${on ? "border-fg" : ""}`}
             >
-              <Sigil id={c.id} />
+              <span className="figure-well">
+                <img src={`/figuren/${c.id}.png`} alt="" className="figure-cut" />
+                <Sigil id={c.id} />
+              </span>
               <span>
                 <span className="display block text-2xl">{c.name}</span>
                 <span className="text-sm text-muted">{c.line}</span>
@@ -580,9 +583,13 @@ function Kit({ duel, dispatch }: { duel: Duel; dispatch: (act: Act) => void }) {
         onNext={() => dispatch({ type: "advance" })}
       />
       <section className="panel flex flex-wrap items-end justify-between gap-4 p-4">
-        <div>
+        <span className="figure-well figure-well-kit">
+          <img src={`/figuren/${c.id}.png`} alt="" className="figure-cut" />
+        </span>
+        <div className="min-w-0 flex-1">
           <p className="display text-3xl">{c.name}</p>
           <p className="text-sm text-muted">{c.ability} · {c.abilityCost} Energie</p>
+          <p className="mt-2 max-w-xl text-sm text-muted">{c.abilityText}</p>
         </div>
         <p className="text-sm tabular-nums text-muted">
           Körper {max.body} · Energie max {max.energy} · Bruch {max.bruch}
