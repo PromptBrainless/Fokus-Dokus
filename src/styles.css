@@ -603,3 +603,10 @@
   height: 168px;
   flex: none;
 }
+
+.gear-art {
+  display: block;
+  width: 100%;
+  height: 5rem;
+  margin-bottom: 0.75rem;
+}
