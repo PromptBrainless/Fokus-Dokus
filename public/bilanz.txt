@@ -1,0 +1,59 @@
+ECHO//BRUCH · Simulationsprotokoll
+Ausgleich erweitert die schwachen Figuren. Brecher und Wächter sind nicht reduziert.
+Läuferin: Kraft 5, Schutz 5. Einmal bewegt, bleiben +2 Rohschaden und das Ignorieren von 2 Schutzbonus und 2 Rüstung für den Kampf.
+Archivar: Schutz 6. Echo auf dem Feld +2 Verteidigung. Erster Treffer −6 und Schutz-Echo. Verbindung legt bei Bedarf ein Schutz-Echo.
+Jäger: Kraft 7, Schutz 4, Bogen 4. Erster Treffer −4. Markierung ignoriert 2 Schutzbonus und 1 Rüstung.
+Paarungen 5×5 · 16 Samen · Schwierigkeit taktisch · Deckel 28 Runden
+Duelle 400 · vollständig, nicht gekürzt
+
+VORHER
+ECHO//BRUCH · Simulationsprotokoll
+Paarungen 5×5 · 16 Samen · Schwierigkeit taktisch · Deckel 28 Runden
+Duelle 400 · vollständig, nicht gekürzt
+
+Siegquote je Figur (beide Seiten, Standardausrüstung)
+Figur | Spiele | Siege | Niederlagen | Unentschieden | Quote | Ø Runden | Ø Körper übrig | Siege nach Grund
+Brecher | 160 | 121 | 23 | 16 | 75.6% | 3.9 | 16.2 | Körper 121
+Wächter | 160 | 113 | 47 | 0 | 70.6% | 5.8 | 14.6 | Bruch 15, Körper 98
+Jäger | 160 | 77 | 83 | 0 | 48.1% | 3.3 | 4.2 | Körper 77
+Läuferin | 160 | 64 | 96 | 0 | 40.0% | 6.6 | 4.9 | Bruch 21, Körper 43
+Archivar | 160 | 17 | 143 | 0 | 10.6% | 4.6 | 3.2 | Körper 2, Echo 14, Bruch 1
+
+Aktionen je Figur (Summe über alle eigenen Züge)
+Brecher | Angriff 78% | Schutz 0% | Bewegung 22% | Einfluss 0%
+Wächter | Angriff 91% | Schutz 9% | Bewegung 0% | Einfluss 0%
+Jäger | Angriff 84% | Schutz 16% | Bewegung 0% | Einfluss 0%
+Läuferin | Angriff 50% | Schutz 12% | Bewegung 39% | Einfluss 0%
+Archivar | Angriff 9% | Schutz 2% | Bewegung 0% | Einfluss 89%
+
+Matrix · Siege der linken Figur / Spiele (Unentschieden in Klammern)
+ | Brecher | Läuferin | Archivar | Wächter | Jäger
+Brecher | 5/16 (8) | 9/16 | 16/16 | 15/16 | 16/16
+Läuferin | 7/16 | 8/16 | 16/16 | 0/16 | 1/16
+Archivar | 0/16 | 0/16 | 8/16 | 0/16 | 1/16
+Wächter | 0/16 | 16/16 | 16/16 | 10/16 | 16/16
+Jäger | 0/16 | 15/16 | 16/16 | 0/16 | 9/16
+
+NACHHER
+Siegquote je Figur (beide Seiten, Standardausrüstung)
+Figur | Spiele | Siege | Niederlagen | Unentschieden | Quote | Ø Runden | Ø Körper übrig | Siege nach Grund
+Brecher | 160 | 126 | 18 | 16 | 78.8% | 3.3 | 14.2 | Körper 124, Bruch 2
+Läuferin | 160 | 84 | 76 | 0 | 52.5% | 5.1 | 5.9 | Körper 84
+Wächter | 160 | 80 | 80 | 0 | 50.0% | 6.8 | 10.8 | Körper 46, Bruch 34
+Jäger | 160 | 65 | 95 | 0 | 40.6% | 3.8 | 4.7 | Körper 65
+Archivar | 160 | 37 | 123 | 0 | 23.1% | 6.0 | 5.7 | Echo 37
+
+Aktionen je Figur (Summe über alle eigenen Züge)
+Brecher | Angriff 92% | Schutz 2% | Bewegung 7% | Einfluss 0%
+Läuferin | Angriff 58% | Schutz 0% | Bewegung 41% | Einfluss 0%
+Wächter | Angriff 89% | Schutz 11% | Bewegung 0% | Einfluss 0%
+Jäger | Angriff 74% | Schutz 9% | Bewegung 0% | Einfluss 17%
+Archivar | Angriff 0% | Schutz 3% | Bewegung 0% | Einfluss 97%
+
+Matrix · Siege der linken Figur / Spiele (Unentschieden in Klammern)
+ | Brecher | Läuferin | Archivar | Wächter | Jäger
+Brecher | 5/16 (8) | 12/16 | 16/16 | 16/16 | 16/16
+Läuferin | 6/16 | 9/16 | 16/16 | 4/16 | 7/16
+Archivar | 0/16 | 0/16 | 9/16 | 10/16 | 0/16
+Wächter | 0/16 | 8/16 | 6/16 | 10/16 | 16/16
+Jäger | 0/16 | 9/16 | 15/16 | 0/16 | 7/16

@@ -1,3 +1,11 @@
-https://github.com/topics/web-design-assets
+# Web-App- und Game-Assets
 
-use this to create our webapp
+- [Web-Design-Assets auf GitHub](https://github.com/topics/web-design-assets)
+- [Kenney Game Assets](https://kenney.nl/assets) – viele Pakete stehen unter CC0.
+- [OpenGameArt](https://opengameart.org/) – Lizenz je Asset prüfen.
+- [itch.io Game Assets](https://itch.io/game-assets) – Lizenz und Nutzungsrechte je Paket prüfen.
+- [Lucide Icons](https://lucide.dev/icons/) – Icon-Bibliothek, im Projekt bereits über `lucide-react` verfügbar.
+
+Für den ECHO//BRUCH-Rebuild zuerst die vorhandenen Quellen in `public/` und
+`attachments/` verwenden. Vor externer Nutzung Lizenz, Namensnennung und
+kommerzielle Rechte des konkreten Assets prüfen.

@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ECHO // BRUCH — Spielfeld</title>
+<style>
+  :root {
+    --bg: #100e10;
+    --panel: #1a1718;
+    --ink: #f3ece4;
+    --muted: #a8988c;
+    --red: #c4523a;
+    --edge: #e28a62;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font-family: "Segoe UI", Calibri, sans-serif; }
+  body { display: flex; flex-direction: column; min-height: 100%; }
+  header { padding: 16px 18px 8px; display: flex; justify-content: space-between; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
+  h1 { margin: 0; font-size: 22px; letter-spacing: 0.08em; font-weight: 650; }
+  p.sub { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
+  .meta { color: var(--muted); font-size: 13px; text-align: right; }
+  main { flex: 1; display: grid; grid-template-columns: 1fr 300px; gap: 12px; padding: 8px 12px 16px; min-height: 0; }
+  #stage {
+    background:
+      radial-gradient(ellipse at 50% 58%, rgba(90, 24, 20, 0.28), transparent 46%),
+      repeating-linear-gradient(0deg, transparent, transparent 22px, rgba(255,255,255,0.015) 23px),
+      #141214;
+    border: 1px solid #3a312c;
+    border-radius: 16px;
+    position: relative;
+    min-height: 640px;
+    touch-action: none;
+    overflow: hidden;
+  }
+  svg { width: 100%; height: 100%; display: block; }
+  .edge { stroke: #6a4034; stroke-width: 3; stroke-linecap: round; }
+  .edge.hot { stroke: #ffd7bf; stroke-width: 5; }
+  .edge.dim { opacity: 0.28; }
+  .node { cursor: grab; }
+  .node:active { cursor: grabbing; }
+  .label { font: 700 26px "Segoe UI", Calibri, sans-serif; text-anchor: middle; dominant-baseline: central; fill: #1a1412; pointer-events: none; }
+  .badge { font: 700 13px "Segoe UI", Calibri, sans-serif; text-anchor: middle; dominant-baseline: central; fill: #f3ece4; pointer-events: none; }
+  .start { font: 700 12px "Segoe UI", Calibri, sans-serif; text-anchor: middle; fill: #f3ece4; pointer-events: none; }
+  aside { background: var(--panel); border: 1px solid #3a312c; border-radius: 16px; padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+  h2 { margin: 0; font-size: 15px; }
+  .muted { color: var(--muted); font-size: 13px; line-height: 1.45; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; }
+  button {
+    background: #2a2422; color: var(--ink); border: 1px solid #5a4c44; border-radius: 999px;
+    padding: 10px 14px; font-size: 14px; cursor: pointer;
+  }
+  button.on { border-color: var(--red); color: #ffd7bf; }
+  button.primary { border-color: var(--red); background: #3a221c; }
+  .keys { display: flex; flex-direction: column; gap: 7px; font-size: 13px; color: var(--ink); }
+  .key { display: flex; align-items: center; gap: 8px; }
+  .mark { width: 18px; height: 18px; border-radius: 50%; flex: 0 0 18px; }
+  ul { margin: 0; padding-left: 18px; }
+  li { margin: 2px 0; }
+  @media (max-width: 860px) {
+    main { grid-template-columns: 1fr; }
+    #stage { min-height: 72vh; }
+    .meta { text-align: left; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>ECHO // BRUCH</h1>
+    <p class="sub">Sieben Felder, dreizehn Verbindungen. Anker ziehen, Kanten bleiben.</p>
+  </div>
+  <div class="meta" id="count">13 Verbindungen</div>
+</header>
+<main>
+  <div id="stage">
+    <svg id="board" viewBox="0 0 1000 1200" preserveAspectRatio="xMidYMid meet">
+      <g id="edges"></g>
+      <g id="nodes"></g>
+    </svg>
+  </div>
+  <aside>
+    <div>
+      <h2 id="title">Feld 1</h2>
+      <p class="muted" id="detail">Grad 2. Nachbarn 2, 3.</p>
+    </div>
+    <div class="keys">
+      <div class="key"><span class="mark" style="background:#f3ece4;box-shadow:0 0 0 3px #ffd7bf"></span>gewählt</div>
+      <div class="key"><span class="mark" style="background:#e7b89a;box-shadow:0 0 0 3px #e28a62"></span>Nachbar des gewählten Feldes</div>
+      <div class="key"><span class="mark" style="background:#8a7d74"></span>nicht verbunden</div>
+      <div class="key"><span class="mark" style="background:#2a2422;border:2px dashed #d6ce78"></span>Start A: 2 oder 4</div>
+      <div class="key"><span class="mark" style="background:#2a2422;border:2px dashed #9ec8e8"></span>Start B: 3 oder 5</div>
+      <div class="key"><span class="mark" style="background:#c4523a"></span>Zahl am Rand = Grad</div>
+    </div>
+    <div class="row">
+      <button id="sym" type="button">Symmetrie fixieren</button>
+      <button id="reset" type="button">Zurücksetzen</button>
+    </div>
+    <div class="row">
+      <button id="png" class="primary" type="button">PNG exportieren</button>
+      <button id="json" type="button">Lage exportieren</button>
+    </div>
+    <div>
+      <h2>Nachbarn</h2>
+      <ul id="neighbors"></ul>
+    </div>
+  </aside>
+</main>
+<script>
+const EDGES = [[1,2],[1,3],[2,3],[2,4],[2,5],[3,4],[3,5],[4,5],[4,6],[4,7],[5,6],[5,7],[6,7]];
+const MIRROR = {1:1, 2:3, 3:2, 4:5, 5:4, 6:7, 7:6};
+const HOME = {
+  1:[500, 160], 2:[290, 400], 3:[710, 400],
+  4:[230, 700], 5:[770, 700], 6:[320, 1010], 7:[680, 1010]
+};
+const START = {2:"A", 4:"A", 3:"B", 5:"B"};
+const pos = {};
+let symmetry = false;
+let selected = 1;
+let drag = null;
+
+const svg = document.getElementById("board");
+const edgeLayer = document.getElementById("edges");
+const nodeLayer = document.getElementById("nodes");
+const neighborsOf = {};
+for (const [a,b] of EDGES) {
+  (neighborsOf[a] ||= []).push(b);
+  (neighborsOf[b] ||= []).push(a);
+}
+for (const id of Object.keys(neighborsOf)) neighborsOf[id].sort((a,b) => a - b);
+
+function reset() {
+  for (const id of Object.keys(HOME)) pos[id] = HOME[id].slice();
+  select(1);
+}
+function mirrorX(x) { return 1000 - x; }
+function ns(name) { return document.createElementNS("http://www.w3.org/2000/svg", name); }
+
+function draw() {
+  const hot = new Set(neighborsOf[selected]);
+  edgeLayer.replaceChildren();
+  for (const [a,b] of EDGES) {
+    const line = ns("line");
+    line.setAttribute("x1", pos[a][0]); line.setAttribute("y1", pos[a][1]);
+    line.setAttribute("x2", pos[b][0]); line.setAttribute("y2", pos[b][1]);
+    const on = a === selected || b === selected;
+    line.setAttribute("class", "edge" + (on ? " hot" : " dim"));
+    edgeLayer.appendChild(line);
+  }
+  nodeLayer.replaceChildren();
+  for (const id of [1,2,3,4,5,6,7]) {
+    const g = ns("g");
+    g.setAttribute("class", "node");
+    g.dataset.id = id;
+    const [x,y] = pos[id];
+    const isSel = id === selected;
+    const isNear = hot.has(id);
+    const fill = isSel ? "#f3ece4" : isNear ? "#e7b89a" : "#8a7d74";
+    const ring = isSel ? "#ffd7bf" : isNear ? "#e28a62" : "#3a312c";
+
+    if (START[id]) {
+      const dash = ns("circle");
+      dash.setAttribute("cx", x); dash.setAttribute("cy", y); dash.setAttribute("r", 48);
+      dash.setAttribute("fill", "none");
+      dash.setAttribute("stroke", START[id] === "A" ? "#d6ce78" : "#9ec8e8");
+      dash.setAttribute("stroke-width", "2");
+      dash.setAttribute("stroke-dasharray", "5 4");
+      g.appendChild(dash);
+      const tag = ns("text");
+      tag.setAttribute("class", "start");
+      tag.setAttribute("x", x);
+      tag.setAttribute("y", y - 58);
+      tag.textContent = START[id];
+      g.appendChild(tag);
+    }
+    if (isSel) {
+      const halo = ns("circle");
+      halo.setAttribute("cx", x); halo.setAttribute("cy", y); halo.setAttribute("r", 44);
+      halo.setAttribute("fill", "none");
+      halo.setAttribute("stroke", "#ffd7bf");
+      halo.setAttribute("stroke-width", "2");
+      g.appendChild(halo);
+    }
+    const c = ns("circle");
+    c.setAttribute("cx", x); c.setAttribute("cy", y); c.setAttribute("r", 34);
+    c.setAttribute("fill", fill); c.setAttribute("stroke", ring); c.setAttribute("stroke-width", isSel ? 5 : 3);
+    const t = ns("text");
+    t.setAttribute("class", "label");
+    t.setAttribute("x", x); t.setAttribute("y", y + 1);
+    t.textContent = id;
+    const badge = ns("circle");
+    badge.setAttribute("cx", x + 26); badge.setAttribute("cy", y + 26); badge.setAttribute("r", 12);
+    badge.setAttribute("fill", "#c4523a");
+    const bt = ns("text");
+    bt.setAttribute("class", "badge");
+    bt.setAttribute("x", x + 26); bt.setAttribute("y", y + 27);
+    bt.textContent = neighborsOf[id].length;
+    g.append(c, t, badge, bt);
+    nodeLayer.appendChild(g);
+  }
+}
+
+function select(id) {
+  selected = id;
+  const nbs = neighborsOf[id];
+  document.getElementById("title").textContent = "Feld " + id;
+  document.getElementById("detail").textContent = "Grad " + nbs.length + ". Nachbarn " + nbs.join(", ") + ".";
+  const ul = document.getElementById("neighbors");
+  ul.replaceChildren();
+  for (const n of nbs) {
+    const li = document.createElement("li");
+    li.textContent = id + " – " + n;
+    ul.appendChild(li);
+  }
+  draw();
+}
+
+function clientToSvg(ev) {
+  const pt = svg.createSVGPoint();
+  pt.x = ev.clientX; pt.y = ev.clientY;
+  const ctm = svg.getScreenCTM();
+  if (!ctm) return [0, 0];
+  const p = pt.matrixTransform(ctm.inverse());
+  return [p.x, p.y];
+}
+
+svg.addEventListener("pointerdown", (ev) => {
+  const g = ev.target.closest(".node");
+  if (!g) return;
+  drag = Number(g.dataset.id);
+  select(drag);
+  svg.setPointerCapture(ev.pointerId);
+});
+svg.addEventListener("pointermove", (ev) => {
+  if (drag == null) return;
+  let [x, y] = clientToSvg(ev);
+  x = Math.max(60, Math.min(940, x));
+  y = Math.max(70, Math.min(1130, y));
+  pos[drag] = [x, y];
+  if (symmetry && drag !== 1) pos[MIRROR[drag]] = [mirrorX(x), y];
+  if (symmetry && drag === 1) pos[1][0] = 500;
+  draw();
+});
+function endDrag() { drag = null; }
+svg.addEventListener("pointerup", endDrag);
+svg.addEventListener("pointercancel", endDrag);
+
+document.getElementById("sym").addEventListener("click", (ev) => {
+  symmetry = !symmetry;
+  ev.currentTarget.classList.toggle("on", symmetry);
+  ev.currentTarget.textContent = symmetry ? "Symmetrie gelöst" : "Symmetrie fixieren";
+  if (symmetry) {
+    pos[1][0] = 500;
+    for (const id of [2,4,6]) pos[MIRROR[id]] = [mirrorX(pos[id][0]), pos[id][1]];
+    draw();
+  }
+});
+document.getElementById("reset").addEventListener("click", reset);
+
+function download(name, blob) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1500);
+}
+
+document.getElementById("json").addEventListener("click", () => {
+  const fields = {};
+  for (const id of [1,2,3,4,5,6,7]) {
+    fields[id] = { x: Math.round(pos[id][0]), y: Math.round(pos[id][1]), grad: neighborsOf[id].length, nachbarn: neighborsOf[id] };
+  }
+  const payload = { name: "ECHO//BRUCH", felder: 7, verbindungen: EDGES, lage: fields };
+  download("ECHO_Spielfeld_Lage.json", new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" }));
+});
+
+document.getElementById("png").addEventListener("click", () => {
+  const xml = new XMLSerializer().serializeToString(svg);
+  const src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1200" viewBox="0 0 1000 1200">' +
+    '<rect width="1000" height="1200" fill="#141214"/>' + xml.replace(/^<svg[^>]*>/, "").replace(/<\/svg>$/, "") + "</svg>"
+  );
+  const image = new Image();
+  image.onload = () => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 1000; canvas.height = 1200;
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = "#141214";
+    ctx.fillRect(0, 0, 1000, 1200);
+    ctx.drawImage(image, 0, 0);
+    canvas.toBlob((blob) => download("ECHO_Spielfeld.png", blob), "image/png");
+  };
+  image.src = src;
+});
+
+document.getElementById("count").textContent = EDGES.length + " Verbindungen";
+reset();
+</script>
+</body>
+</html>
