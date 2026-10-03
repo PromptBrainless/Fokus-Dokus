@@ -1,3 +1,12 @@
+import {
+  BIND_BRUCH_REDUCTION,
+  BLIND_BRUCH,
+  ECHO_SPLITTER_CHARGES,
+  ENERGY_CELL_AMOUNT,
+  HEAL_AMOUNT,
+  MAX_ECHO_CHARGES,
+} from "./tuning.ts";
+
 export type Side = "A" | "B";
 export type ActionKind = "attack" | "guard" | "move" | "influence";
 export type EchoKind =
@@ -64,6 +73,7 @@ export interface Item {
   id: string;
   name: string;
   text: string;
+  tempo: number;
 }
 
 export const CHARACTERS: Character[] = [
@@ -244,11 +254,21 @@ export const GEAR: Gear[] = [
 ];
 
 export const ITEMS: Item[] = [
-  { id: "heil", name: "Heilmittel", text: "4 Körper. Entfernt Verletzt." },
-  { id: "zelle", name: "Energiezelle", text: "3 Energie, nicht über das Maximum." },
-  { id: "binde", name: "Bruchbinde", text: "2 Bruch weniger. Gebunden bis Ende der nächsten Runde." },
-  { id: "splitter", name: "Echo-Splitter", text: "Ein eigenes Echo erhält 2 Ladungen, höchstens 3." },
-  { id: "blend", name: "Blendpulver", text: "Ziel wird Verwirrt. Ist es das schon, 1 Bruch." },
+  { id: "heil", name: "Heilmittel", text: `${HEAL_AMOUNT} Körper. Entfernt Verletzt.`, tempo: -1 },
+  { id: "zelle", name: "Energiezelle", text: `${ENERGY_CELL_AMOUNT} Energie, nicht über das Maximum.`, tempo: 0 },
+  {
+    id: "binde",
+    name: "Bruchbinde",
+    text: `${BIND_BRUCH_REDUCTION} Bruch weniger. Gebunden bis Ende der nächsten Runde.`,
+    tempo: 0,
+  },
+  {
+    id: "splitter",
+    name: "Echo-Splitter",
+    text: `Ein eigenes Echo erhält ${ECHO_SPLITTER_CHARGES} Ladungen, höchstens ${MAX_ECHO_CHARGES}.`,
+    tempo: 0,
+  },
+  { id: "blend", name: "Blendpulver", text: `Ziel wird Verwirrt. Ist es das schon, ${BLIND_BRUCH} Bruch.`, tempo: 0 },
 ];
 
 export const ACTIONS: { id: ActionKind; name: string; tempo: number; text: string }[] = [
@@ -323,7 +343,7 @@ export const SUGGESTED: Record<
   { weaponId: string; armorId: string; toolId: string; artifactId: string; items: [string, string] }
 > = {
   brecher: {
-    weaponId: "hammer",
+    weaponId: "speer",
     armorId: "platte",
     toolId: "brecheisen",
     artifactId: "anker",

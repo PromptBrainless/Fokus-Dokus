@@ -8,7 +8,7 @@ import {
   type GameState,
 } from "./model.ts";
 import {
-  armorReduction,
+  armorReductionValue,
   minimumHitDamage,
   preparePlan,
   protectedDamage,
@@ -45,7 +45,7 @@ test("die Figurenwerte entsprechen den PDF-Werten", () => {
 });
 
 test("Rüstung und Schutzbonus halbieren den Schadensabzug aufgerundet", () => {
-  assert.equal(armorReduction(3, 2), 3);
+  assert.equal(armorReductionValue(3, 2), 3);
   assert.equal(minimumHitDamage(5, 3, 2), 2);
   assert.equal(minimumHitDamage(1, 8, 5), 2);
   assert.equal(protectedDamage(2, 4), 1);
@@ -79,6 +79,7 @@ test("ein Angriff ohne Reichweite kostet Energie und verursacht 1 Bruch", () => 
   const state = duel("kern");
   state.fighters.A.field = 2;
   state.fighters.B.field = 7;
+  state.fighters.A.weaponId = "kurzschwert";
   const attack = { ...emptyPlan(), action: "attack" as const, energy: 1 };
   const guard = { ...emptyPlan(), action: "guard" as const };
   const frames = resolveRound(state, attack, guard);
@@ -97,6 +98,112 @@ test("gleicher Seed und gleiche Pläne ergeben identische Runden", () => {
   const first = resolveRound(state, plans.A, plans.B);
   const second = resolveRound(state, plans.A, plans.B);
   assert.deepEqual(first, second);
+});
+
+test("kritische Vollregel-Treffer verursachen Verletzt und verdoppeln den Schaden", () => {
+  let found = false;
+  for (let seed = 1; seed <= 20 && !found; seed += 1) {
+    const state = createGame(
+      { ...suggestedSetup("jaeger", "A"), field: 2 },
+      { ...suggestedSetup("waechter", "B"), field: 3 },
+      seed,
+      "voll",
+    );
+    const frames = resolveRound(
+      state,
+      { ...emptyPlan(), action: "attack" },
+      { ...emptyPlan(), action: "guard" },
+    );
+    const result = frames.at(-1)!.state;
+    if (result.log.some((line) => line.includes("kritisch ×2"))) {
+      found = true;
+      assert.ok(result.fighters.B.statuses.some((status) => status.kind === "wounded"));
+    }
+  }
+  assert.equal(found, true);
+});
+
+test("Parade wirkt nur nach einer erfolgreichen Schutzaktion", () => {
+  const state = createGame(
+    { ...suggestedSetup("brecher", "A"), weaponId: "hammer", field: 2 },
+    { ...suggestedSetup("laeuferin", "B"), weaponId: "kurzschwert", field: 3 },
+    91,
+    "voll",
+  );
+  state.fighters.B.energy = 1;
+  const frames = resolveRound(
+    state,
+    { ...emptyPlan(), action: "attack" },
+    { ...emptyPlan(), action: "guard", reaction: "parry" },
+  );
+  const result = frames.at(-1)!.state;
+  assert.equal(result.fighters.B.energy, 2);
+  assert.ok(result.log.some((line) => line.includes("pariert")));
+});
+
+test("Feld prägen legt höchstens einen eigenen Marker auf ein freies Feld", () => {
+  const state = duel();
+  const frames = resolveRound(
+    state,
+    {
+      ...emptyPlan(),
+      action: "influence",
+      influence: "marker",
+      markerKind: "brand",
+      energy: 2,
+      targetField: 1,
+    },
+    emptyPlan(),
+  );
+  const result = frames.at(-1)!.state;
+  assert.deepEqual(
+    result.markers.map(({ owner, kind, field, duration }) => ({ owner, kind, field, duration })),
+    [{ owner: "A", kind: "brand", field: 1, duration: 2 }],
+  );
+});
+
+test("ein gewähltes Angriffs-Echo verbraucht genau eine Ladung", () => {
+  const state = duel();
+  const echoId = "test-echo";
+  state.fighters.A.echoes.push({
+    id: echoId,
+    owner: "A",
+    kind: "attack",
+    field: state.fighters.A.field,
+    charges: 2,
+    used: false,
+    ttl: 0,
+  });
+  const frames = resolveRound(
+    state,
+    { ...emptyPlan(), action: "attack", echoId },
+    { ...emptyPlan(), action: "guard" },
+  );
+  const echo = frames.at(-1)!.state.fighters.A.echoes.find((entry) => entry.id === echoId);
+  assert.equal(echo?.charges, 1);
+  assert.ok(frames.at(-1)!.state.log.some((line) => line.includes("Angriffs-Echo")));
+});
+
+test("Echo-Umwandlung braucht Einfluss, Energie und eine Ladung", () => {
+  const state = duel();
+  const echoId = "convertible";
+  state.fighters.A.echoes.push({
+    id: echoId,
+    owner: "A",
+    kind: "attack",
+    field: state.fighters.A.field,
+    charges: 2,
+    used: false,
+    ttl: 0,
+  });
+  const frames = resolveRound(
+    state,
+    { ...emptyPlan(), action: "influence", influence: "convert", energy: 1, echoId },
+    emptyPlan(),
+  );
+  const echo = frames.at(-1)!.state.fighters.A.echoes.find((entry) => entry.id === echoId);
+  assert.equal(echo?.kind, "trap");
+  assert.equal(echo?.charges, 1);
 });
 
 test("beide Regelstufen erhalten Körper- und Bruchsieg ohne Echo-Sieg in kern", () => {

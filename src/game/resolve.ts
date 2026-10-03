@@ -29,13 +29,30 @@ import {
 import {
   BLOCK_DAMAGE,
   BLOCK_ENERGY_DAMAGE,
+  BIND_BRUCH_REDUCTION,
+  BLIND_BRUCH,
+  BOUND_DURATION,
+  BODY_LOSS_PER_ROUND_WOUNDED,
+  CONFUSED_DURATION,
   CORE_ATTACK_POINTS,
   CORE_ATTACK_POINTS_WITH_THREE_ENERGY,
+  CRITICAL_FACE,
   DEF_BASE,
+  DESTROYED_CORE_BRUCH,
+  DESTROYED_CORE_ENERGY_LOSS,
+  ECHO_SPLITTER_CHARGES,
+  ENERGY_CELL_AMOUNT,
+  ENERGY_REGEN,
   ENERGY_RAW_BONUS,
+  FIELD_MARKER_DURATION,
+  HEAL_AMOUNT,
   HARD_HIT,
+  MAX_ATTACK_ENERGY,
   MAX_BRUCH_PER_HIT,
+  MAX_ECHO_CHARGES,
+  MIN_ENERGY,
   MIN_HIT,
+  WOUND_DURATION,
 } from "./tuning.ts";
 
 export interface Frame {
@@ -49,12 +66,12 @@ export interface Frame {
   state: GameState;
 }
 
-export function armorReduction(protectionBonus: number, armor: number): number {
+export function armorReductionValue(protectionBonus: number, armor: number): number {
   return Math.ceil((Math.max(0, protectionBonus) + Math.max(0, armor)) / 2);
 }
 
 export function minimumHitDamage(raw: number, protectionBonus: number, armor: number): number {
-  return Math.max(MIN_HIT, raw - armorReduction(protectionBonus, armor));
+  return Math.max(MIN_HIT, raw - armorReductionValue(protectionBonus, armor));
 }
 
 export function protectedDamage(damage: number, reduction: number): number {
@@ -66,22 +83,66 @@ export function attackPreview(state: GameState, side: Side, plan: Plan) {
   const defender = state.fighters[other(side)];
   const attackStats = liveStats(attacker);
   const defenseStats = liveStats(defender);
-  const attack = attackStats.weapon + attackStats.kraftB + plan.energy;
-  const defense = DEF_BASE + defenseStats.schutzB + defenseStats.moveB;
+  const dist = distance(attacker.field, defender.field);
+  const marked = defender.marked && attacker.characterId === "jaeger";
+  const selectedEcho = attacker.echoes.find((echo) => echo.id === plan.echoId && echo.charges > 0);
+  const attack =
+    attackStats.weapon +
+    attackStats.kraftB +
+    plan.energy +
+    (attacker.pursued ? 1 : 0) +
+    (marked ? 2 : 0);
+  let defense = DEF_BASE + defenseStats.schutzB + defenseStats.moveB;
+  if (attacker.weaponId === "bogen") defense -= Math.min(defenseStats.moveB, 1);
+  if (
+    state.markers.some((marker) => marker.field === defender.field && marker.kind === "mist") ||
+    defender.echoes.some((echo) => echo.kind === "mist" && echo.field === defender.field && echo.charges > 0)
+  ) {
+    defense += 2;
+  }
   const threshold = defense - attack;
-  const successfulRolls = Math.max(0, Math.min(6, 7 - threshold));
-  const raw = attackStats.weapon + attackStats.kraftB + (ENERGY_RAW_BONUS[Math.min(3, plan.energy)] ?? 0);
-  const base = minimumHitDamage(raw, defenseStats.schutzB, defenseStats.armor);
+  const inRange =
+    dist <= attackStats.range &&
+    !(attacker.weaponId === "bogen" && hasStatus(attacker, "bound")) &&
+    !(hasStatus(attacker, "confused") && plan.targetField !== defender.field);
+  const raw =
+    attackStats.weapon +
+    attackStats.kraftB +
+    (ENERGY_RAW_BONUS[Math.min(MAX_ATTACK_ENERGY, plan.energy)] ?? 0) +
+    (selectedEcho?.kind === "attack" && selectedEcho.field === attacker.field ? 1 : 0) +
+    (state.markers.some((marker) => marker.field === defender.field && marker.kind === "brand") ? 1 : 0) +
+    (plan.ability && attacker.characterId === "brecher" ? 2 : 0) -
+    (dist === 0 && attacker.weaponId === "speer" ? 1 : 0);
+  const protection = Math.max(0, defenseStats.schutzB - (marked ? 1 : 0));
+  const base = minimumHitDamage(raw, protection, defenseStats.armor);
+  const openBonus = isOpen(defender) ? 1 : 0;
+  const guarded = defender.statuses.find((status) => status.kind === "guarded");
   const successfulDamage = Array.from({ length: 6 }, (_, index) => {
     const die = index + 1;
-    return die >= threshold ? (die === 6 ? base * 2 : base) : null;
+    if (!inRange || die < threshold) return null;
+    let damage = base + openBonus;
+    if (guarded) damage = protectedDamage(damage, guarded.power || BLOCK_DAMAGE);
+    return die === CRITICAL_FACE ? damage * 2 : damage;
   }).filter((value): value is number => value !== null);
-  const protectedHits = successfulDamage.map((damage) => protectedDamage(damage, BLOCK_DAMAGE));
+  const protectedHits = Array.from({ length: 6 }, (_, index) => {
+    const die = index + 1;
+    if (!inRange || die < threshold) return null;
+    const damage = protectedDamage(base + openBonus, plan.energy >= 1 ? BLOCK_ENERGY_DAMAGE : BLOCK_DAMAGE);
+    return die === CRITICAL_FACE ? damage * 2 : damage;
+  }).filter((value): value is number => value !== null);
+  const successfulRolls = inRange ? Math.max(0, Math.min(6, 7 - threshold)) : 0;
   return {
     chance: Math.round((successfulRolls / 6) * 100),
     damage: damageRange(successfulDamage),
     protectedDamage: damageRange(protectedHits.map((damage) => protectedDamage(damage, BLOCK_DAMAGE))),
-    bruch: Math.min(MAX_BRUCH_PER_HIT, (plan.energy >= 2 ? 1 : 0) + (base >= HARD_HIT ? 1 : 0)),
+    bruch: inRange
+      ? Math.min(
+          MAX_BRUCH_PER_HIT,
+          (plan.energy >= 2 ? 1 : 0) +
+            (base + openBonus >= HARD_HIT ? 1 : 0) +
+            (fullRules(state) ? 1 : 0),
+        )
+      : 1,
     cost: plan.energy,
   };
 }
@@ -180,7 +241,7 @@ export function beginRound(input: GameState): { state: GameState; line: string }
   const lines: string[] = [];
   for (const side of ["A", "B"] as Side[]) {
     const f = state.fighters[side];
-    const gain = f.stabilizeNext ? 1 : 2;
+    const gain = f.stabilizeNext ? Math.max(0, ENERGY_REGEN - 1) : ENERGY_REGEN;
     f.stabilizeNext = false;
     f.energy = Math.min(f.energyMax, f.energy + gain);
     f.guardBonus = 0;
@@ -240,27 +301,27 @@ function applyItem(state: GameState, f: Fighter, foe: Fighter, plan: Plan) {
   if (!item) return;
   item.spent = true;
   if (item.id === "heil") {
-    f.body = Math.min(f.bodyMax, f.body + 4);
+    f.body = Math.min(f.bodyMax, f.body + HEAL_AMOUNT);
     removeStatus(f, "wounded");
-    note(state, `${name(f)} nimmt das Heilmittel. +4 Körper.`);
+    note(state, `${name(f)} nimmt das Heilmittel. +${HEAL_AMOUNT} Körper.`);
   } else if (item.id === "zelle") {
-    f.energy = Math.min(f.energyMax, f.energy + 3);
+    f.energy = Math.min(f.energyMax, f.energy + ENERGY_CELL_AMOUNT);
     note(state, `${name(f)} setzt die Energiezelle ein.`);
   } else if (item.id === "binde") {
-    f.bruch = Math.max(0, f.bruch - 2);
+    f.bruch = Math.max(0, f.bruch - BIND_BRUCH_REDUCTION);
     if (f.bruch < f.bruchMax) f.collapse = false;
-    addStatus(f, "bound", 2);
+    addStatus(f, "bound", BOUND_DURATION);
     note(state, `${name(f)} bindet den Bruch und wird gebunden.`);
   } else if (item.id === "splitter") {
     const echo = ownEcho(f, plan.echoId);
     if (echo) {
-      echo.charges = Math.min(3, echo.charges + 2);
+      echo.charges = Math.min(MAX_ECHO_CHARGES, echo.charges + ECHO_SPLITTER_CHARGES);
       echo.used = true;
       note(state, `${name(f)} speist ein Echo mit dem Splitter.`);
     }
   } else if (item.id === "blend") {
-    if (hasStatus(foe, "confused")) gainBruch(state, foe, 1, null);
-    else addStatus(foe, "confused", 2);
+    if (hasStatus(foe, "confused")) gainBruch(state, foe, BLIND_BRUCH, null);
+    else addStatus(foe, "confused", CONFUSED_DURATION);
     note(state, `${name(f)} wirft Blendpulver.`);
   }
 }
@@ -337,6 +398,7 @@ function doMove(state: GameState, f: Fighter, foe: Fighter, plan: Plan, steps: n
   if (moveEcho) {
     moveEcho.charges -= 1;
     moveEcho.used = true;
+    note(state, `${name(f)} aktiviert ein Bewegungs-Echo und erhält +1 Feld Weite.`);
   }
   leaveField(state, f, plan);
   const land = path[path.length - 1];
@@ -348,7 +410,7 @@ function doMove(state: GameState, f: Fighter, foe: Fighter, plan: Plan, steps: n
       charges += 1;
       state.markers = state.markers.filter((m) => m.id !== mirror.id);
     }
-    pushEcho(state, { owner: f.side, kind: "move", field: f.field, charges: Math.min(3, charges) });
+    pushEcho(state, { owner: f.side, kind: "move", field: f.field, charges: Math.min(MAX_ECHO_CHARGES, charges) });
     note(state, `${name(f)} hinterlässt ein Bewegungs-Echo auf Feld ${f.field}.`);
   }
   note(state, `${name(f)} geht nach Feld ${f.field}.`);
@@ -424,19 +486,13 @@ function resolveAttack(
   const echoB = fullRules(state)
     ? attackEchoBonus(attacker, plan.echoId)
     : { raw: 0, bruch: 0, echo: false };
+  if (echoB.echo) note(state, `${name(attacker)} aktiviert ein Angriffs-Echo.`);
   let defense = DEF_BASE + dStats.schutzB + dStats.moveB;
   if (attacker.weaponId === "bogen") defense -= Math.min(dStats.moveB, 1);
   const mist =
     markerAt(state, defender.field)?.kind === "mist" ||
     defender.echoes.some((e) => e.kind === "mist" && e.field === defender.field && e.charges > 0);
   if (mist) defense += 2;
-  if (
-    fullRules(state) &&
-    defender.characterId === "archivar" &&
-    defender.echoes.some((e) => e.field === defender.field && e.charges > 0)
-  ) {
-    defense += 2;
-  }
   if (fullRules(state) && echoB.echo && defender.armorId === "spiegel" && !defender.spiegelUsed) {
     defense += 1;
     defender.spiegelUsed = true;
@@ -445,6 +501,7 @@ function resolveAttack(
   const hit = die + attack >= defense;
   const diceNote = `Würfel ${die}. Angriff ${attack} gegen Verteidigung ${defense}.`;
   if (!hit) {
+    if (marked) defender.marked = false;
     if (attacker.weaponId === "hammer") {
       gainBruch(state, attacker, 1, plan);
       note(state, `${name(attacker)} verfehlt mit dem Hammer und nimmt 1 Bruch. ${diceNote}`);
@@ -452,7 +509,7 @@ function resolveAttack(
     return { hit: false, ended: false };
   }
 
-  const energyRaw = ENERGY_RAW_BONUS[Math.min(3, plan.energy)] ?? 0;
+  const energyRaw = ENERGY_RAW_BONUS[Math.min(MAX_ATTACK_ENERGY, plan.energy)] ?? 0;
   const energyBruch = plan.energy >= 2 ? 1 : 0;
   const brand = fullRules(state) && markerAt(state, defender.field)?.kind === "brand" ? 1 : 0;
   const raw =
@@ -464,10 +521,16 @@ function resolveAttack(
     opts.rawMod -
     (dist === 0 && attacker.weaponId === "speer" ? 1 : 0);
   const protection = Math.max(0, dStats.schutzB - (marked ? 1 : 0) - opts.ignoreSchutz);
-  const armorReduction = Math.ceil((protection + aArmor(defender)) / 2);
-  let end = Math.max(MIN_HIT, raw - armorReduction);
+  const protectionReduction = armorReductionValue(protection, aArmor(defender));
+  let end = Math.max(MIN_HIT, raw - protectionReduction);
+  if (plan.ability && attacker.characterId === "brecher") {
+    removeStatus(defender, "guarded");
+    const shield = defender.echoes.find((e) => e.kind === "guard");
+    if (shield) shield.charges = Math.max(0, shield.charges - 1);
+  }
   if (blockedByBarrier) end = Math.max(0, end - 2);
   const soak = guardEchoSoak(defender, defenderPlan?.echoId ?? null);
+  if (soak.dmg) note(state, `${name(defender)} aktiviert ein Schutz-Echo und verhindert ${soak.dmg} Schaden.`);
   end = Math.max(0, end - soak.dmg);
   const guarded = defender.statuses.find((s) => s.kind === "guarded");
   let bruchMod = energyBruch + echoB.bruch - soak.bruch;
@@ -486,27 +549,19 @@ function resolveAttack(
   }
   const fieldGuard = markerAt(state, defender.field);
   if (fieldGuard?.kind === "guard") {
-    end = Math.max(0, end - 2);
+    end = Math.max(guarded ? 1 : 0, end - 2);
     state.markers = state.markers.filter((m) => m.id !== fieldGuard.id);
   }
   if (isOpen(defender)) {
     end += 1;
     bruchMod += 1;
   }
-  const crit = die === 6 && !opts.noCrit;
+  const crit = die === CRITICAL_FACE && !opts.noCrit;
   if (crit) {
     end *= 2;
     bruchMod += 1;
   }
   if (attacker.weaponId === "hammer") bruchMod += 1;
-  if (end >= HARD_HIT) bruchMod += 1;
-  if (plan.ability && attacker.characterId === "brecher") {
-    removeStatus(defender, "guarded");
-    const shield = defender.echoes.find((e) => e.kind === "guard");
-    if (shield) shield.charges = Math.max(0, shield.charges - 1);
-  }
-
-  const dodgedAll = false;
   if (defenderPlan?.reaction === "dodge" && defenderPlan.action === "move" && defender.energy >= 2) {
     defender.energy -= 2;
     const away = freeNeighbor(defender, attacker, attacker.field);
@@ -514,30 +569,36 @@ function resolveAttack(
       leaveField(state, defender, defenderPlan);
       shift(state, defender, attacker, away);
     }
-    end = Math.max(0, end - 2);
+    end = Math.max(guarded ? 1 : 0, end - 2);
     note(state, `${name(defender)} weicht aus. −2 Körper.`);
   }
 
-  const dealt = dodgedAll ? 0 : hurt(state, defender, end);
-  const bruch = dodgedAll
-    ? 0
-    : gainBruch(state, defender, Math.min(MAX_BRUCH_PER_HIT, Math.max(0, bruchMod)), defenderPlan);
-  if (marked && !dodgedAll) {
+  if (end >= HARD_HIT) bruchMod += 1;
+  const calculatedDamage = end;
+  const dealt = hurt(state, defender, calculatedDamage);
+  const bruch = gainBruch(
+    state,
+    defender,
+    Math.min(MAX_BRUCH_PER_HIT, Math.max(0, bruchMod)),
+    defenderPlan,
+  );
+  if (marked) {
     pushEcho(state, { owner: attacker.side, kind: "attack", field: attacker.field, charges: 2 });
+    note(state, `${name(attacker)} erzeugt ein Angriffs-Echo mit 2 Ladungen.`);
   }
   defender.marked = false;
   if (crit && fullRules(state)) {
     pushEcho(state, { owner: attacker.side, kind: "attack", field: attacker.field, charges: 2 });
-    if (!guarded && !dodgedAll && dealt > 0) addStatus(defender, "wounded", 2);
+    note(state, `${name(attacker)} erzeugt durch den kritischen Treffer ein Angriffs-Echo mit 2 Ladungen.`);
+    if (!guarded && dealt > 0) addStatus(defender, "wounded", WOUND_DURATION);
   }
   if (fullRules(state)) dropDeadEchoes(state, attacker, plan);
-  if (attacker.weaponId === "kurzschwert" && !dodgedAll) {
+  if (attacker.weaponId === "kurzschwert") {
     const back = freeNeighbor(attacker, defender, defender.field);
     if (back != null) attacker.field = back;
   }
   if (
     attacker.weaponId === "kette" &&
-    !dodgedAll &&
     attacker.energy >= 1 &&
     defender.artifactId !== "anker" &&
     defender.toolId !== "anker"
@@ -553,7 +614,7 @@ function resolveAttack(
   }
   note(
     state,
-    `${name(attacker)} trifft ${name(defender)}${opts.tag}. ${diceNote} Rohschaden ${raw} − Schutz/Rüstung ${armorReduction} = ${Math.max(MIN_HIT, raw - armorReduction)}; ${guarded ? `Geschützt −${guarded.power || BLOCK_DAMAGE}` : "ohne Geschützt"}; Endschaden ${dealt}, Bruch ${bruch}${crit ? ". Kritisch" : ""}.`,
+    `${name(attacker)} trifft ${name(defender)}${opts.tag}. ${diceNote} Rohschaden ${aStats.weapon} Waffe + ${aStats.kraftB} Kraft + ${energyRaw} Energie + Echo/Spur − ${protectionReduction} Schutz/Rüstung = ${Math.max(MIN_HIT, raw - protectionReduction)}; ${guarded ? `Geschützt −${guarded.power || BLOCK_DAMAGE}` : "ohne Geschützt"}; Endschaden ${calculatedDamage}, Körperverlust ${dealt}, Bruch ${bruch}${crit ? " (kritisch ×2)" : ""}.`,
   );
   dropDeadEchoes(state, defender, defenderPlan);
   if (killBody(state, defender.side)) return { hit: true, ended: true };
@@ -606,9 +667,9 @@ function crackCore(state: GameState, attacker: Fighter, defender: Fighter, point
   target.points = Math.max(0, target.points - points);
   note(state, `${name(attacker)} bricht ein Kern-Echo. Noch ${target.points} ${target.points === 1 ? "Punkt" : "Punkte"}.`);
   if (target.points === 0) {
-    defender.energyMax = Math.max(3, defender.energyMax - 1);
+    defender.energyMax = Math.max(MIN_ENERGY, defender.energyMax - DESTROYED_CORE_ENERGY_LOSS);
     defender.energy = Math.min(defender.energy, defender.energyMax);
-    gainBruch(state, defender, 1, null);
+    gainBruch(state, defender, DESTROYED_CORE_BRUCH, null);
     addStatus(defender, "open", 1);
     note(state, `Ein Kern von ${name(defender)} zerbricht.`);
     if (killEcho(state, defender.side)) return true;
@@ -634,8 +695,8 @@ function doInfluence(state: GameState, f: Fighter, foe: Fighter, plan: Plan): bo
       !markerAt(state, field) &&
       !ownMarker
     ) {
-      placeMarker(state, f.side, kind, field, 2);
-      note(state, `${name(f)} prägt einen ${kind}-Marker auf Feld ${field} für 2 Runden.`);
+      placeMarker(state, f.side, kind, field, FIELD_MARKER_DURATION);
+      note(state, `${name(f)} prägt einen ${kind}-Marker auf Feld ${field} für ${FIELD_MARKER_DURATION} Runden.`);
     } else {
       note(state, `${name(f)} kann den Feldmarker dort nicht prägen.`);
     }
@@ -655,6 +716,7 @@ function doInfluence(state: GameState, f: Fighter, foe: Fighter, plan: Plan): bo
   if (influenceEcho) {
     influenceEcho.charges -= 1;
     influenceEcho.used = true;
+    note(state, `${name(f)} aktiviert ein Einfluss-Echo.`);
   }
   const reach = influenceRange(state, f, influenceEcho?.id);
   const inReach = dist <= reach;
@@ -665,7 +727,7 @@ function doInfluence(state: GameState, f: Fighter, foe: Fighter, plan: Plan): bo
     }
     const echoes = f.echoes.slice(0, 2);
     for (const echo of echoes) {
-      echo.charges = Math.min(3, echo.charges + 1);
+      echo.charges = Math.min(MAX_ECHO_CHARGES, echo.charges + 1);
       echo.used = true;
     }
     note(state, `${name(f)} verbindet die eigenen Echos.`);
@@ -719,14 +781,14 @@ function doInfluence(state: GameState, f: Fighter, foe: Fighter, plan: Plan): bo
       owner: f.side,
       kind: "influence",
       field: f.field,
-      charges: Math.min(3, charges),
+      charges: Math.min(MAX_ECHO_CHARGES, charges),
     });
     note(state, `${name(f)} legt ein Einfluss-Echo auf Feld ${f.field}.`);
   }
   if (plan.energy >= 2 && plan.influence !== "spur") {
     const echo = f.echoes[0];
     if (echo) {
-      echo.charges = Math.min(3, echo.charges + 1);
+      echo.charges = Math.min(MAX_ECHO_CHARGES, echo.charges + 1);
       echo.used = true;
     }
   }
@@ -801,7 +863,7 @@ function endRound(state: GameState) {
   for (const side of ["A", "B"] as Side[]) {
     const f = state.fighters[side];
     if (fullRules(state) && hasStatus(f, "wounded")) {
-      hurt(state, f, 1);
+      hurt(state, f, BODY_LOSS_PER_ROUND_WOUNDED);
       note(state, `${name(f)} blutet. −1 Körper.`);
     }
     tickStatuses(f, ["wounded"]);
@@ -1034,7 +1096,7 @@ export function preparePlan(state: GameState, side: Side, plan: Plan): Plan {
       next.energy = cost;
     }
   }
-  next.energy = Math.max(0, Math.min(3, next.energy, f.energy));
+  next.energy = Math.max(0, Math.min(MAX_ATTACK_ENERGY, next.energy, f.energy));
   if (next.echoId) {
     const selected = f.echoes.find((echo) => echo.id === next.echoId && echo.charges > 0);
     const valid =

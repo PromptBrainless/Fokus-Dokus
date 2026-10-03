@@ -46,6 +46,7 @@ import {
   type Setup,
 } from "@/game/model";
 import { attackPreview, beginRound, preparePlan, pressStone, resolveRound, type Frame } from "@/game/resolve";
+import { BLOCK_DAMAGE, BLOCK_ENERGY_DAMAGE, DEF_BASE, MIN_HIT } from "@/game/tuning";
 import { Board } from "./board";
 
 type Screen = "title" | "roster" | "kit" | "deploy" | "cover" | "plan" | "scene" | "end" | "ledger";
@@ -1319,8 +1320,8 @@ function Codex({ ruleStage, onClose }: { ruleStage: RuleStage; onClose: () => vo
         <div className="mt-4 flex flex-col gap-3 text-sm text-muted">
           <p>Regelstufe: {ruleStage === "kern" ? "Einfach" : "Vollregeln"}.</p>
           <p>Sieg durch Körper 0 oder wenn das Bruchmaximum die letzte Runde beendet.{ruleStage === "voll" ? " In den Vollregeln gewinnt ihr zusätzlich durch drei zerstörte Kern-Echos." : ""}</p>
-          <p>Jede Runde: Energie +2, verdeckt planen, aufdecken und nach Aktionswert handeln. Ein Angriff trifft, wenn W6 + Angriff mindestens Verteidigung erreicht; Kraftbonus zählt auch zum Rohschaden.</p>
-          <p>Schutz verhindert 3 Schaden und 1 Bruch; mit eingesetzter Energie verhindert er 4 Schaden. Bewegung folgt den Verbindungen. Parade verhindert zusätzlich 2 Schaden und gibt 1 Energie zurück.</p>
+          <p>Jede Runde: Energie +2, verdeckt planen, aufdecken und nach Aktionswert handeln. Verteidigung beginnt bei {DEF_BASE}. Ein Angriff trifft, wenn W6 + Angriff mindestens Verteidigung erreicht; Kraftbonus zählt auch zum Rohschaden. Treffer verursachen mindestens {MIN_HIT} Schaden.</p>
+          <p>Schutz verhindert {BLOCK_DAMAGE} Schaden und 1 Bruch; mit eingesetzter Energie verhindert er {BLOCK_ENERGY_DAMAGE} Schaden. Bewegung folgt den Verbindungen. Parade verhindert zusätzlich 2 Schaden und gibt 1 Energie zurück.</p>
           {ruleStage === "voll" && <p>Echos, Kerne, Marker, Zustände, Items, Muster und ein Regelbruch pro Kampf ergänzen die Grundaktionen. Höchstens ein Item und ein Echo pro Runde.</p>}
         </div>
       </div>

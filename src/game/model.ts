@@ -1,4 +1,5 @@
 import {
+  ACTIONS,
   ARMORS,
   type ActionKind,
   type Character,
@@ -7,6 +8,7 @@ import {
   EDGES,
   type EchoKind,
   GEAR,
+  ITEMS,
   type InfluenceMode,
   type MarkerKind,
   type ReactionKind,
@@ -18,7 +20,19 @@ import {
   WEAPONS,
   byId,
 } from "./content.ts";
-import { CORE_POINTS } from "./tuning.ts";
+import {
+  BODY_BASE,
+  BRUCH_BASE,
+  CORE_POINTS,
+  ENERGY_BASE,
+  MAX_ECHOES,
+  MAX_ECHO_CHARGES,
+  MAX_ENERGY,
+  MIN_ENERGY,
+  INFLUENCE_RANGE,
+  INFLUENCE_RANGE_WITH_ECHO,
+  START_ENERGY,
+} from "./tuning.ts";
 
 export interface Echo {
   id: string;
@@ -266,13 +280,13 @@ export function derivedMax(setup: Setup): { body: number; energy: number; bruch:
   const c = characterOf(setup.characterId);
   const armor = byId(ARMORS, setup.armorId);
   const gear = [setup.toolId, setup.artifactId];
-  let body = 12 + c.schutz + armor.body;
-  let energy = 4 + Math.floor(c.bewegung / 3);
-  let bruch = 4 + Math.floor(c.schutz / 2);
+  let body = BODY_BASE + c.schutz + armor.body;
+  let energy = ENERGY_BASE + Math.floor(c.bewegung / 3);
+  let bruch = BRUCH_BASE + Math.floor(c.schutz / 2);
   if (gear.includes("spiegelkern")) energy -= 1;
   if (gear.includes("zeitnadel")) body -= 2;
   if (gear.includes("bruchstein")) bruch += 2;
-  energy = Math.max(3, Math.min(8, energy));
+  energy = Math.max(MIN_ENERGY, Math.min(MAX_ENERGY, energy));
   return { body, energy, bruch };
 }
 
@@ -304,7 +318,7 @@ export function createFighter(setup: Setup, side: Side): Fighter {
     field: setup.field,
     body: max.body,
     bodyMax: max.body,
-    energy: 2,
+    energy: START_ENERGY,
     energyMax: max.energy,
     bruch: 0,
     bruchMax: max.bruch,
@@ -505,7 +519,7 @@ export function placeMarker(
 
 export function pushEcho(state: GameState, echo: Omit<Echo, "id" | "used" | "ttl"> & { ttl?: number }) {
   const owner = state.fighters[echo.owner];
-  if (owner.echoes.length >= 4) {
+  if (owner.echoes.length >= MAX_ECHOES) {
     owner.echoes.sort((a, b) => a.charges - b.charges);
     owner.echoes.shift();
   }
@@ -514,6 +528,7 @@ export function pushEcho(state: GameState, echo: Omit<Echo, "id" | "used" | "ttl
     used: true,
     ttl: echo.ttl ?? 0,
     ...echo,
+    charges: Math.min(MAX_ECHO_CHARGES, echo.charges),
   });
 }
 
@@ -521,7 +536,7 @@ export function influenceRange(state: GameState, f: Fighter, echoId?: string | n
   const echo = f.echoes.find(
     (e) => e.kind === "influence" && e.field === f.field && e.charges > 0 && e.id === echoId,
   );
-  return echo ? 4 : 3;
+  return echo ? INFLUENCE_RANGE_WITH_ECHO : INFLUENCE_RANGE;
 }
 
 export function moveSteps(f: Fighter, energy: number, ability: boolean, echoId?: string | null): number {
@@ -538,15 +553,13 @@ export function moveSteps(f: Fighter, energy: number, ability: boolean, echoId?:
 }
 
 export function actionTempo(action: ActionKind): number {
-  if (action === "guard") return -1;
-  if (action === "move") return 2;
-  return 0;
+  return byId(ACTIONS, action).tempo;
 }
 
 export function actionValue(f: Fighter, plan: Plan): number {
   const stats = liveStats(f);
   let value = stats.tempo + actionTempo(plan.action) + plan.energy;
-  if (plan.itemId === "heil") value -= 1;
+  if (plan.itemId) value += ITEMS.find((item) => item.id === plan.itemId)?.tempo ?? 0;
   if (plan.zeitnadel) value += 2;
   if (f.predictStrike && plan.action) value += 2;
   return value;
