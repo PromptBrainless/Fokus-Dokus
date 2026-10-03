@@ -1,4 +1,5 @@
 import {
+  ACTIONS,
   ARMORS,
   type ActionKind,
   type Character,
@@ -7,16 +8,31 @@ import {
   EDGES,
   type EchoKind,
   GEAR,
+  ITEMS,
   type InfluenceMode,
   type MarkerKind,
   type ReactionKind,
   type RuleBreak,
+  type RuleStage,
   type Side,
   type StatusKind,
   SUGGESTED,
   WEAPONS,
   byId,
-} from "./content";
+} from "./content.ts";
+import {
+  BODY_BASE,
+  BRUCH_BASE,
+  CORE_POINTS,
+  ENERGY_BASE,
+  MAX_ECHOES,
+  MAX_ECHO_CHARGES,
+  MAX_ENERGY,
+  MIN_ENERGY,
+  INFLUENCE_RANGE,
+  INFLUENCE_RANGE_WITH_ECHO,
+  START_ENERGY,
+} from "./tuning.ts";
 
 export interface Echo {
   id: string;
@@ -106,9 +122,11 @@ export interface Plan {
   mist: boolean;
   mask: boolean;
   freeConvert: boolean;
+  markerKind?: MarkerKind | null;
 }
 
 export interface GameState {
+  ruleStage: RuleStage;
   round: number;
   startSide: Side;
   fighters: Record<Side, Fighter>;
@@ -207,10 +225,10 @@ export function liveStats(f: Fighter): Live {
   const c = characterOf(f.characterId);
   const weapon = byId(WEAPONS, f.weaponId);
   const armor = byId(ARMORS, f.armorId);
-  let kraft = c.kraft;
-  let schutz = c.schutz;
-  let bewegung = c.bewegung;
-  let kontrolle = c.kontrolle + armor.kontrolle;
+  const kraft = c.kraft;
+  const schutz = c.schutz;
+  const bewegung = c.bewegung;
+  const kontrolle = c.kontrolle + armor.kontrolle;
   let tempo = c.tempo + weapon.tempo + armor.tempo;
   let kraftB = bonus(kraft);
   let schutzB = bonus(schutz) + f.guardBonus;
@@ -262,13 +280,13 @@ export function derivedMax(setup: Setup): { body: number; energy: number; bruch:
   const c = characterOf(setup.characterId);
   const armor = byId(ARMORS, setup.armorId);
   const gear = [setup.toolId, setup.artifactId];
-  let body = 12 + c.schutz + armor.body;
-  let energy = 4 + Math.floor(c.bewegung / 3);
-  let bruch = 4 + Math.floor(c.schutz / 2);
+  let body = BODY_BASE + c.schutz + armor.body;
+  let energy = ENERGY_BASE + Math.floor(c.bewegung / 3);
+  let bruch = BRUCH_BASE + Math.floor(c.schutz / 2);
   if (gear.includes("spiegelkern")) energy -= 1;
   if (gear.includes("zeitnadel")) body -= 2;
   if (gear.includes("bruchstein")) bruch += 2;
-  energy = Math.max(3, Math.min(8, energy));
+  energy = Math.max(MIN_ENERGY, Math.min(MAX_ENERGY, energy));
   return { body, energy, bruch };
 }
 
@@ -300,13 +318,13 @@ export function createFighter(setup: Setup, side: Side): Fighter {
     field: setup.field,
     body: max.body,
     bodyMax: max.body,
-    energy: 2,
+    energy: START_ENERGY,
     energyMax: max.energy,
     bruch: 0,
     bruchMax: max.bruch,
     statuses: [],
     echoes: [],
-    cores: c.cores.map((kind) => ({ kind, points: 3, revealed: false })),
+    cores: c.cores.map((kind) => ({ kind, points: CORE_POINTS, revealed: false })),
     lastAction: null,
     pattern: { attack: 0, guard: 0, move: 0, influence: 0 },
     ruleBreak: true,
@@ -332,11 +350,32 @@ export function createFighter(setup: Setup, side: Side): Fighter {
   };
 }
 
-export function createGame(a: Setup, b: Setup, seed = Date.now() % 1_000_000): GameState {
+export function createGame(
+  a: Setup,
+  b: Setup,
+  seed = Date.now() % 1_000_000,
+  ruleStage: RuleStage = "voll",
+): GameState {
+  const setupForRules = (setup: Setup): Setup =>
+    ruleStage === "kern" ? { ...setup, toolId: "", artifactId: "", items: ["", ""] } : setup;
+  const fighters = {
+    A: createFighter(setupForRules(a), "A"),
+    B: createFighter(setupForRules(b), "B"),
+  };
+  if (ruleStage === "kern") {
+    for (const fighter of Object.values(fighters)) {
+      fighter.items = [];
+      fighter.cores = [];
+      fighter.echoes = [];
+      fighter.ruleBreak = false;
+      fighter.pattern = { attack: 0, guard: 0, move: 0, influence: 0 };
+    }
+  }
   return {
+    ruleStage,
     round: 0,
     startSide: "A",
-    fighters: { A: createFighter(a, "A"), B: createFighter(b, "B") },
+    fighters,
     markers: [],
     log: [],
     winner: null,
@@ -365,6 +404,7 @@ export function emptyPlan(): Plan {
     mist: false,
     mask: false,
     freeConvert: false,
+    markerKind: null,
   };
 }
 
@@ -479,7 +519,7 @@ export function placeMarker(
 
 export function pushEcho(state: GameState, echo: Omit<Echo, "id" | "used" | "ttl"> & { ttl?: number }) {
   const owner = state.fighters[echo.owner];
-  if (owner.echoes.length >= 4) {
+  if (owner.echoes.length >= MAX_ECHOES) {
     owner.echoes.sort((a, b) => a.charges - b.charges);
     owner.echoes.shift();
   }
@@ -488,33 +528,38 @@ export function pushEcho(state: GameState, echo: Omit<Echo, "id" | "used" | "ttl
     used: true,
     ttl: echo.ttl ?? 0,
     ...echo,
+    charges: Math.min(MAX_ECHO_CHARGES, echo.charges),
   });
 }
 
-export function influenceRange(state: GameState, f: Fighter): number {
-  const echo = f.echoes.find((e) => e.kind === "influence" && e.field === f.field && e.charges > 0);
-  return echo ? 4 : 3;
+export function influenceRange(state: GameState, f: Fighter, echoId?: string | null): number {
+  const echo = f.echoes.find(
+    (e) => e.kind === "influence" && e.field === f.field && e.charges > 0 && e.id === echoId,
+  );
+  return echo ? INFLUENCE_RANGE_WITH_ECHO : INFLUENCE_RANGE;
 }
 
-export function moveSteps(f: Fighter, energy: number, ability: boolean): number {
+export function moveSteps(f: Fighter, energy: number, ability: boolean, echoId?: string | null): number {
   if (ability && f.characterId === "laeuferin") return 2;
   const stats = liveStats(f);
   let steps = stats.moveRange;
   if (energy >= 1) steps += 1;
   if (energy >= 2) steps += 1;
   if (hasStatus(f, "bound")) steps -= 1;
+  if (echoId && f.echoes.some((echo) => echo.id === echoId && echo.kind === "move" && echo.charges > 0)) {
+    steps += 1;
+  }
   return Math.max(0, steps);
 }
 
 export function actionTempo(action: ActionKind): number {
-  if (action === "guard") return -1;
-  if (action === "move") return 2;
-  return 0;
+  return byId(ACTIONS, action).tempo;
 }
 
 export function actionValue(f: Fighter, plan: Plan): number {
   const stats = liveStats(f);
   let value = stats.tempo + actionTempo(plan.action) + plan.energy;
+  if (plan.itemId) value += ITEMS.find((item) => item.id === plan.itemId)?.tempo ?? 0;
   if (plan.zeitnadel) value += 2;
   if (f.predictStrike && plan.action) value += 2;
   return value;

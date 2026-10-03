@@ -1,7 +1,7 @@
-import { choosePlan } from "./ai";
-import type { Difficulty, Side } from "./content";
-import { createGame, suggestedSetup } from "./model";
-import { beginRound, resolveRound } from "./resolve";
+import { choosePlan } from "./ai.ts";
+import type { Difficulty, Side } from "./content.ts";
+import { createGame, suggestedSetup } from "./model.ts";
+import { beginRound, resolveRound } from "./resolve.ts";
 
 function play(left: string, right: string, diff: Difficulty, seed: number) {
   let pack = beginRound(createGame(suggestedSetup(left, "A"), suggestedSetup(right, "B"), seed));

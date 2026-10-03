@@ -1,3 +1,12 @@
+import {
+  BIND_BRUCH_REDUCTION,
+  BLIND_BRUCH,
+  ECHO_SPLITTER_CHARGES,
+  ENERGY_CELL_AMOUNT,
+  HEAL_AMOUNT,
+  MAX_ECHO_CHARGES,
+} from "./tuning.ts";
+
 export type Side = "A" | "B";
 export type ActionKind = "attack" | "guard" | "move" | "influence";
 export type EchoKind =
@@ -11,9 +20,10 @@ export type EchoKind =
   | "rift";
 export type MarkerKind = "brand" | "mist" | "mirror" | "guard" | "rift" | "bind";
 export type StatusKind = "open" | "bound" | "confused" | "wounded" | "guarded";
-export type ReactionKind = "dodge" | "riposte" | "stabilize" | "secure";
-export type InfluenceMode = "spur" | "kern" | "weaken" | "convert";
+export type ReactionKind = "dodge" | "riposte" | "stabilize" | "secure" | "parry";
+export type InfluenceMode = "spur" | "kern" | "weaken" | "convert" | "marker";
 export type RuleBreak = "retarget" | "brace" | "refund";
+export type RuleStage = "kern" | "voll";
 export type Difficulty = "bedacht" | "taktisch" | "brutal";
 
 export interface Character {
@@ -63,6 +73,7 @@ export interface Item {
   id: string;
   name: string;
   text: string;
+  tempo: number;
 }
 
 export const CHARACTERS: Character[] = [
@@ -86,14 +97,13 @@ export const CHARACTERS: Character[] = [
     id: "laeuferin",
     name: "Läuferin",
     line: "Durchgang",
-    kraft: 5,
-    schutz: 5,
+    kraft: 3,
+    schutz: 3,
     bewegung: 8,
     kontrolle: 5,
     tempo: 8,
     cores: ["move", "move", "influence"],
-    passive:
-      "Ignoriert den ersten negativen Feldmarker, den sie in der Runde betritt. Hat sie sich einmal bewegt, tragen ihre Angriffe in diesem Kampf +2 Rohschaden und ignorieren 2 Schutzbonus und 2 Rüstung.",
+    passive: "Ignoriert den ersten negativen Feldmarker, den sie pro Runde betritt.",
     ability: "Seitenwechsel",
     abilityCost: 2,
     abilityAction: "move",
@@ -104,13 +114,12 @@ export const CHARACTERS: Character[] = [
     name: "Archivar",
     line: "Speichern",
     kraft: 3,
-    schutz: 6,
+    schutz: 4,
     bewegung: 4,
     kontrolle: 9,
     tempo: 4,
     cores: ["influence", "guard", "move"],
-    passive:
-      "Ein durch Einfluss ohne Item erzeugtes Echo erhält 1 zusätzliche Ladung. Ein eigenes Echo auf dem Feld gibt +2 Verteidigung. Der erste Treffer des Kampfes ist um 2 Körper niedriger und legt ein Schutz-Echo mit 2 Ladungen.",
+    passive: "Ein durch Einfluss ohne Item erzeugtes Echo erhält 1 zusätzliche Ladung.",
     ability: "Verbindung",
     abilityCost: 3,
     abilityAction: "influence",
@@ -137,17 +146,17 @@ export const CHARACTERS: Character[] = [
     id: "jaeger",
     name: "Jäger",
     line: "Verfolgen",
-    kraft: 7,
-    schutz: 4,
+    kraft: 6,
+    schutz: 3,
     bewegung: 5,
     kontrolle: 4,
     tempo: 7,
     cores: ["attack", "move", "influence"],
-    passive: "Verlässt der Gegner sein Feld, +1 Angriffswert gegen ihn bis zum Rundenende. Der erste Treffer des Kampfes ist um 2 Körper niedriger.",
+    passive: "Verlässt der Gegner durch Bewegung sein Feld, erhält der Jäger bis zum Rundenende +1 Angriffswert gegen ihn.",
     ability: "Markieren",
     abilityCost: 1,
     abilityAction: "influence",
-    abilityText: "Ziel in Reichweite 3 markieren. Der nächste Angriff: +2 Angriffswert, ignoriert 2 Schutzbonus und 1 Rüstung, Angriffs-Echo mit 2 Ladungen.",
+    abilityText: "Ziel in Reichweite 3 markieren. Der nächste Angriff erhält +2 Angriffswert, ignoriert 1 Schutzbonus und erzeugt ein Angriffs-Echo mit 2 Ladungen.",
   },
 ];
 
@@ -179,7 +188,7 @@ export const WEAPONS: Weapon[] = [
   {
     id: "bogen",
     name: "Bogen",
-    value: 4,
+    value: 3,
     range: 3,
     tempo: 1,
     text: "Ignoriert den ersten Bewegungsbonus des Ziels. Nicht bei Gebunden.",
@@ -245,11 +254,21 @@ export const GEAR: Gear[] = [
 ];
 
 export const ITEMS: Item[] = [
-  { id: "heil", name: "Heilmittel", text: "4 Körper. Entfernt Verletzt." },
-  { id: "zelle", name: "Energiezelle", text: "3 Energie, nicht über das Maximum." },
-  { id: "binde", name: "Bruchbinde", text: "2 Bruch weniger. Gebunden bis Ende der nächsten Runde." },
-  { id: "splitter", name: "Echo-Splitter", text: "Ein eigenes Echo erhält 2 Ladungen, höchstens 3." },
-  { id: "blend", name: "Blendpulver", text: "Ziel wird Verwirrt. Ist es das schon, 1 Bruch." },
+  { id: "heil", name: "Heilmittel", text: `${HEAL_AMOUNT} Körper. Entfernt Verletzt.`, tempo: -1 },
+  { id: "zelle", name: "Energiezelle", text: `${ENERGY_CELL_AMOUNT} Energie, nicht über das Maximum.`, tempo: 0 },
+  {
+    id: "binde",
+    name: "Bruchbinde",
+    text: `${BIND_BRUCH_REDUCTION} Bruch weniger. Gebunden bis Ende der nächsten Runde.`,
+    tempo: 0,
+  },
+  {
+    id: "splitter",
+    name: "Echo-Splitter",
+    text: `Ein eigenes Echo erhält ${ECHO_SPLITTER_CHARGES} Ladungen, höchstens ${MAX_ECHO_CHARGES}.`,
+    tempo: 0,
+  },
+  { id: "blend", name: "Blendpulver", text: `Ziel wird Verwirrt. Ist es das schon, ${BLIND_BRUCH} Bruch.`, tempo: 0 },
 ];
 
 export const ACTIONS: { id: ActionKind; name: string; tempo: number; text: string }[] = [
@@ -260,6 +279,7 @@ export const ACTIONS: { id: ActionKind; name: string; tempo: number; text: strin
 ];
 
 export const REACTIONS: { id: ReactionKind; name: string; cost: number; text: string }[] = [
+  { id: "parry", name: "Parade", cost: 0, text: "Bei Schutzaktion: verhindert zusätzlich 2 Schaden und erhält 1 Energie." },
   { id: "dodge", name: "Ausweichen", cost: 2, text: "Nach Treffer, wenn du Bewegung gewählt hast: 1 Feld, 2 Schaden weniger." },
   { id: "riposte", name: "Gegenstoß", cost: 2, text: "Nach Treffer, wenn du Angriff gewählt hast: Gegenangriff, −2 Rohschaden, kein Krit." },
   { id: "stabilize", name: "Stabilisieren", cost: 1, text: "Wenn du mindestens 2 Bruch erhieltest: 1 verhindern. Nächste Runde −1 Energie." },
@@ -323,7 +343,7 @@ export const SUGGESTED: Record<
   { weaponId: string; armorId: string; toolId: string; artifactId: string; items: [string, string] }
 > = {
   brecher: {
-    weaponId: "hammer",
+    weaponId: "speer",
     armorId: "platte",
     toolId: "brecheisen",
     artifactId: "anker",
@@ -339,7 +359,7 @@ export const SUGGESTED: Record<
   archivar: {
     weaponId: "kette",
     armorId: "spiegel",
-    toolId: "rauch",
+    toolId: "brecheisen",
     artifactId: "spiegelkern",
     items: ["splitter", "zelle"],
   },
