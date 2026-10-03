@@ -13,6 +13,7 @@ import {
 import { preparePlan } from "./resolve";
 
 function bestPattern(state: GameState, side: Side): ActionKind | null {
+  if (state.ruleStage === "kern") return null;
   const pattern = state.fighters[side].pattern;
   const entries = (Object.keys(pattern) as ActionKind[]).filter((key) => pattern[key] >= 3);
   return entries[0] ?? null;
@@ -36,24 +37,26 @@ export function choosePlan(state: GameState, side: Side, difficulty: Difficulty)
     for (const field of reachable(me.field, steps, foe.field)) {
       candidates.push({ ...emptyPlan(), action: "move", energy, targetField: field });
     }
-    candidates.push({ ...emptyPlan(), action: "influence", energy, influence: "spur", targetField: me.field });
-    if (energy >= 1 && dist <= 3) {
-      candidates.push({ ...emptyPlan(), action: "influence", energy, influence: "kern", targetField: foe.field });
+    if (state.ruleStage !== "kern") {
+      candidates.push({ ...emptyPlan(), action: "influence", energy, influence: "spur", targetField: me.field });
+      if (energy >= 1 && dist <= 3) {
+        candidates.push({ ...emptyPlan(), action: "influence", energy, influence: "kern", targetField: foe.field });
+      }
     }
   }
 
-  if (me.characterId === "brecher" && me.energy >= 3 && dist <= 1 && me.abilityRound !== state.round) {
+  if (state.ruleStage !== "kern" && me.characterId === "brecher" && me.energy >= 3 && dist <= 1 && me.abilityRound !== state.round) {
     candidates.push({ ...emptyPlan(), action: "attack", energy: 3, ability: true, targetField: foe.field });
   }
-  if (me.characterId === "laeuferin" && me.energy >= 2 && me.abilityRound !== state.round) {
+  if (state.ruleStage !== "kern" && me.characterId === "laeuferin" && me.energy >= 2 && me.abilityRound !== state.round) {
     for (const field of reachable(me.field, 2, foe.field)) {
       candidates.push({ ...emptyPlan(), action: "move", energy: 2, ability: true, targetField: field });
     }
   }
-  if (me.characterId === "waechter" && me.energy >= 2 && me.abilityRound !== state.round) {
+  if (state.ruleStage !== "kern" && me.characterId === "waechter" && me.energy >= 2 && me.abilityRound !== state.round) {
     candidates.push({ ...emptyPlan(), action: "guard", energy: 2, ability: true, targetField: me.field });
   }
-  if (me.characterId === "jaeger" && me.energy >= 1 && dist <= 3 && me.abilityRound !== state.round && !foe.marked) {
+  if (state.ruleStage !== "kern" && me.characterId === "jaeger" && me.energy >= 1 && dist <= 3 && me.abilityRound !== state.round && !foe.marked) {
     candidates.push({
       ...emptyPlan(),
       action: "influence",
@@ -63,7 +66,7 @@ export function choosePlan(state: GameState, side: Side, difficulty: Difficulty)
       targetField: foe.field,
     });
   }
-  if (me.characterId === "archivar" && me.energy >= 3 && me.echoes.length >= 2 && me.abilityRound !== state.round) {
+  if (state.ruleStage !== "kern" && me.characterId === "archivar" && me.energy >= 3 && me.echoes.length >= 2 && me.abilityRound !== state.round) {
     candidates.push({
       ...emptyPlan(),
       action: "influence",
@@ -77,7 +80,8 @@ export function choosePlan(state: GameState, side: Side, difficulty: Difficulty)
   let best = candidates[0] ?? emptyPlan();
   let bestScore = -Infinity;
   for (const plan of candidates) {
-    let score = Math.random() * (difficulty === "brutal" ? 4 : 8);
+    let score = Math.random() * (difficulty === "brutal" ? 2 : 4);
+    score -= plan.energy * 2.5;
     const nextDist = plan.action === "move" && plan.targetField ? distance(plan.targetField, foe.field) : dist;
     if (plan.action === "attack") {
       score += 18 + stats.weapon + stats.kraftB + plan.energy * 2;
@@ -111,15 +115,6 @@ export function choosePlan(state: GameState, side: Side, difficulty: Difficulty)
     if (plan.ability && plan.action === "attack") score += 8;
     if (plan.ability && plan.action !== "attack") score += plan.action === "guard" ? 6 : 8;
     if (me.characterId === "jaeger" && plan.ability && foeStats.schutzB + foeStats.armor >= 4) score += 16;
-    if (me.characterId === "laeuferin" && me.flank && plan.action === "attack") score += 24;
-    if (
-      me.characterId === "laeuferin" &&
-      !me.flank &&
-      foeStats.schutzB + foeStats.armor >= 4 &&
-      plan.action === "move"
-    ) {
-      score += 32;
-    }
     if (me.characterId === "laeuferin" && dist > stats.range && plan.action === "move") score += 12;
     if (me.characterId === "archivar" && me.body < me.bodyMax * 0.55 && plan.action === "guard") score += 16;
     if (me.characterId === "archivar" && plan.influence === "kern") score += 8;
@@ -131,6 +126,7 @@ export function choosePlan(state: GameState, side: Side, difficulty: Difficulty)
   }
 
   const ready = preparePlan(state, side, best);
+  if (state.ruleStage === "kern") return ready;
   const heal = me.items.find((i) => i.id === "heil" && !i.spent);
   const cell = me.items.find((i) => i.id === "zelle" && !i.spent);
   const brace = me.items.find((i) => i.id === "binde" && !i.spent);

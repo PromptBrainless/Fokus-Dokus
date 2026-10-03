@@ -24,6 +24,7 @@ import {
   type ActionKind,
   type Difficulty,
   type Side,
+  type RuleStage,
 } from "@/game/content";
 import { choosePlan } from "@/game/ai";
 import {
@@ -44,7 +45,7 @@ import {
   type Plan,
   type Setup,
 } from "@/game/model";
-import { beginRound, preparePlan, resolveRound, useStone, type Frame } from "@/game/resolve";
+import { beginRound, preparePlan, pressStone, resolveRound, type Frame } from "@/game/resolve";
 import { Board } from "./board";
 
 type Screen = "title" | "roster" | "kit" | "deploy" | "cover" | "plan" | "scene" | "end" | "ledger";
@@ -53,6 +54,7 @@ interface Duel {
   screen: Screen;
   mode: "bot" | "hotseat";
   difficulty: Difficulty;
+  ruleStage: RuleStage;
   focus: Side;
   afterCover: Screen;
   setup: Record<Side, Setup>;
@@ -71,6 +73,7 @@ interface Duel {
 
 type Act =
   | { type: "difficulty"; value: Difficulty }
+  | { type: "ruleStage"; value: RuleStage }
   | { type: "boot"; mode: "bot" | "hotseat" }
   | { type: "quick" }
   | { type: "character"; id: string }
@@ -144,6 +147,7 @@ function initial(): Duel {
     screen: "title",
     mode: "bot",
     difficulty: "taktisch",
+    ruleStage: "voll",
     focus: "A",
     afterCover: "plan",
     setup: { A: suggestedSetup("jaeger", "A"), B: suggestedSetup("waechter", "B") },
@@ -162,7 +166,7 @@ function initial(): Duel {
 }
 
 function openBattle(state: Duel, setup: Record<Side, Setup>): Duel {
-  const begun = beginRound(createGame(setup.A, setup.B));
+  const begun = beginRound(createGame(setup.A, setup.B, undefined, state.ruleStage));
   return {
     ...state,
     setup,
@@ -221,6 +225,8 @@ function reduce(state: Duel, act: Act): Duel {
       };
     case "difficulty":
       return { ...state, difficulty: act.value };
+    case "ruleStage":
+      return { ...state, ruleStage: act.value };
     case "boot":
       return { ...state, mode: act.mode, focus: "A", screen: "roster" };
     case "quick": {
@@ -297,7 +303,7 @@ function reduce(state: Duel, act: Act): Duel {
       return { ...state, draft: act.plan };
     case "stone":
       if (!state.game) return state;
-      return { ...state, game: useStone(state.game, state.focus) };
+      return { ...state, game: pressStone(state.game, state.focus) };
     case "lock": {
       if (!state.game || state.game.over) return state;
       const plan = preparePlan(state.game, state.focus, state.draft);
@@ -337,7 +343,7 @@ function reduce(state: Duel, act: Act): Duel {
     case "rematch":
       return openBattle(state, state.setup);
     case "title":
-      return { ...initial(), wins: state.wins, losses: state.losses, muted: state.muted, auto: state.auto, difficulty: state.difficulty };
+      return { ...initial(), wins: state.wins, losses: state.losses, muted: state.muted, auto: state.auto, difficulty: state.difficulty, ruleStage: state.ruleStage };
     case "ledger":
       return { ...state, screen: "ledger", codex: false };
     default:
@@ -462,13 +468,13 @@ export function GameApp() {
       {(duel.screen === "deploy" || duel.screen === "plan" || duel.screen === "scene") && view && (
         <Battle duel={duel} view={view} beat={beat} dispatch={dispatch} />
       )}
-      {duel.codex && <Codex onClose={() => dispatch({ type: "codex" })} />}
+      {duel.codex && <Codex ruleStage={duel.ruleStage} onClose={() => dispatch({ type: "codex" })} />}
     </div>
   );
 }
 
 function Title({ duel, dispatch }: { duel: Duel; dispatch: (act: Act) => void }) {
-  const preview = createGame(duel.setup.A, duel.setup.B);
+  const preview = createGame(duel.setup.A, duel.setup.B, undefined, duel.ruleStage);
   const levels: { id: Difficulty; name: string; text: string }[] = [
     { id: "bedacht", name: "Bedacht", text: "Hält Abstand, liest Muster, spielt den Wächter." },
     { id: "taktisch", name: "Taktisch", text: "Kontert dein Set und mischt Einfluss mit Druck." },
@@ -484,6 +490,23 @@ function Title({ duel, dispatch }: { duel: Duel; dispatch: (act: Act) => void })
             Plane verdeckt. Lies deinen Gegner. Hinterlasse eine Spur. Sieben Felder, vier Aktionen, drei Wege zum Sieg.
           </p>
         </header>
+        <div className="grid gap-2 sm:grid-cols-2" aria-label="Regelstufe wählen">
+          {([
+            ["kern", "Einfach", "Angriff, Schutz, Bewegung und Ausweichen."],
+            ["voll", "Vollregeln", "Echos, Kerne, Items, Muster und Regelbruch."],
+          ] as const).map(([id, title, text]) => (
+            <button
+              key={id}
+              type="button"
+              className={`difficulty-choice panel p-3 text-left ${duel.ruleStage === id ? "is-active" : ""}`}
+              onClick={() => dispatch({ type: "ruleStage", value: id })}
+              aria-pressed={duel.ruleStage === id}
+            >
+              <span className="display text-xl">{title}</span>
+              <span className="mt-1 block text-xs leading-relaxed text-muted">{text}</span>
+            </button>
+          ))}
+        </div>
         <div className="grid gap-2 sm:grid-cols-3">
           {levels.map((level) => (
             <button
@@ -588,8 +611,8 @@ function Kit({ duel, dispatch }: { duel: Duel; dispatch: (act: Act) => void }) {
         </span>
         <div className="min-w-0 flex-1">
           <p className="display text-3xl">{c.name}</p>
-          <p className="text-sm text-muted">{c.ability} · {c.abilityCost} Energie</p>
-          <p className="mt-2 max-w-xl text-sm text-muted">{c.abilityText}</p>
+          {duel.ruleStage === "voll" && <p className="text-sm text-muted">{c.ability} · {c.abilityCost} Energie</p>}
+          {duel.ruleStage === "voll" && <p className="mt-2 max-w-xl text-sm text-muted">{c.abilityText}</p>}
         </div>
         <p className="text-sm tabular-nums text-muted">
           Körper {max.body} · Energie max {max.energy} · Bruch {max.bruch}
@@ -597,9 +620,11 @@ function Kit({ duel, dispatch }: { duel: Duel; dispatch: (act: Act) => void }) {
       </section>
       <GearRow title="Waffe" selected={setup.weaponId} options={WEAPONS.map((w) => ({ id: w.id, name: w.name, text: `Wert ${w.value} · Reichweite ${w.range} · ${w.text}` }))} onPick={(id) => dispatch({ type: "slot", slot: "weaponId", id })} />
       <GearRow title="Rüstung" selected={setup.armorId} options={ARMORS.map((w) => ({ id: w.id, name: w.name, text: `Wert ${w.value} · Körper +${w.body} · ${w.text}` }))} onPick={(id) => dispatch({ type: "slot", slot: "armorId", id })} />
-      <GearRow title="Werkzeug" selected={setup.toolId} options={GEAR.filter((g) => g.slot === "tool").map((w) => ({ id: w.id, name: w.name, text: w.text }))} onPick={(id) => dispatch({ type: "slot", slot: "toolId", id })} />
-      <GearRow title="Artefakt" selected={setup.artifactId} options={GEAR.filter((g) => g.slot === "artifact").map((w) => ({ id: w.id, name: w.name, text: w.text }))} onPick={(id) => dispatch({ type: "slot", slot: "artifactId", id })} />
-      <GearRow title="Verbrauch · zwei" selected={setup.items[0]} also={setup.items[1]} options={ITEMS.map((w) => ({ id: w.id, name: w.name, text: w.text }))} onPick={(id) => dispatch({ type: "item", id })} />
+      {duel.ruleStage === "voll" && <>
+        <GearRow title="Werkzeug" selected={setup.toolId} options={GEAR.filter((g) => g.slot === "tool").map((w) => ({ id: w.id, name: w.name, text: w.text }))} onPick={(id) => dispatch({ type: "slot", slot: "toolId", id })} />
+        <GearRow title="Artefakt" selected={setup.artifactId} options={GEAR.filter((g) => g.slot === "artifact").map((w) => ({ id: w.id, name: w.name, text: w.text }))} onPick={(id) => dispatch({ type: "slot", slot: "artifactId", id })} />
+        <GearRow title="Verbrauch · zwei" selected={setup.items[0]} also={setup.items[1]} options={ITEMS.map((w) => ({ id: w.id, name: w.name, text: w.text }))} onPick={(id) => dispatch({ type: "item", id })} />
+      </>}
     </main>
   );
 }
@@ -830,7 +855,7 @@ function Planner({ duel, view, dispatch }: { duel: Duel; view: GameState; dispat
           <p className="text-sm tabular-nums text-muted">Aktionswert {actionValue(f, ready)}</p>
         </div>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          {ACTIONS.map((action) => {
+          {ACTIONS.filter((action) => duel.ruleStage === "voll" || action.id !== "influence").map((action) => {
             const Icon = ACTION_ICON[action.id];
             const on = draft.action === action.id && !draft.ability;
             return (
@@ -860,26 +885,28 @@ function Planner({ duel, view, dispatch }: { duel: Duel; view: GameState; dispat
               {n}
             </button>
           ))}
-          <button
-            type="button"
-            disabled={!canAbility}
-            className={`btn ${draft.ability ? "btn-on" : ""}`}
-            onClick={() =>
-              dispatch({
-                type: "draft",
-                plan: {
-                  ...draft,
-                  ability: !draft.ability,
-                  action: c.abilityAction,
-                  energy: c.abilityCost,
-                },
-              })
-            }
-          >
-            {c.ability} · {c.abilityCost}
-          </button>
+          {duel.ruleStage === "voll" && (
+            <button
+              type="button"
+              disabled={!canAbility}
+              className={`btn ${draft.ability ? "btn-on" : ""}`}
+              onClick={() =>
+                dispatch({
+                  type: "draft",
+                  plan: {
+                    ...draft,
+                    ability: !draft.ability,
+                    action: c.abilityAction,
+                    energy: c.abilityCost,
+                  },
+                })
+              }
+            >
+              {c.ability} · {c.abilityCost}
+            </button>
+          )}
         </div>
-        {draft.action === "influence" && !draft.ability && (
+        {duel.ruleStage === "voll" && draft.action === "influence" && !draft.ability && (
           <div className="flex flex-wrap gap-2">
             {(
               [
@@ -901,7 +928,7 @@ function Planner({ duel, view, dispatch }: { duel: Duel; view: GameState; dispat
           </div>
         )}
         <div className="flex gap-2 overflow-x-auto">
-          {REACTIONS.map((reaction) => (
+          {REACTIONS.filter((reaction) => duel.ruleStage === "voll" || reaction.id === "dodge").map((reaction) => (
             <button
               key={reaction.id}
               type="button"
@@ -916,7 +943,7 @@ function Planner({ duel, view, dispatch }: { duel: Duel; view: GameState; dispat
               {reaction.name} · {reaction.cost}
             </button>
           ))}
-          {f.items
+          {duel.ruleStage === "voll" && f.items
             .filter((item) => !item.spent)
             .map((item) => (
               <button
@@ -935,7 +962,7 @@ function Planner({ duel, view, dispatch }: { duel: Duel; view: GameState; dispat
             ))}
         </div>
         <div className="flex flex-wrap gap-2">
-          {f.ruleBreak &&
+          {duel.ruleStage === "voll" && f.ruleBreak &&
             (["brace", "refund", "retarget"] as const).map((id) => (
               <button
                 key={id}
@@ -951,22 +978,22 @@ function Planner({ duel, view, dispatch }: { duel: Duel; view: GameState; dispat
                 {id === "brace" ? "Regelbruch · 2 Bruch halten" : id === "refund" ? "Regelbruch · Stufe zurück" : "Regelbruch · Ziel ändern"}
               </button>
             ))}
-          {f.nadelReady && (
+          {duel.ruleStage === "voll" && f.nadelReady && (
             <button type="button" className={`btn ${draft.zeitnadel ? "btn-on" : ""}`} onClick={() => dispatch({ type: "draft", plan: { ...draft, zeitnadel: !draft.zeitnadel } })}>
               Zeitnadel
             </button>
           )}
-          {(f.toolId === "rauch" || f.artifactId === "rauch") && (
+          {duel.ruleStage === "voll" && (f.toolId === "rauch" || f.artifactId === "rauch") && (
             <button type="button" className={`btn ${draft.mist ? "btn-on" : ""}`} onClick={() => dispatch({ type: "draft", plan: { ...draft, mist: !draft.mist } })}>
               Rauchkapsel
             </button>
           )}
-          {(f.toolId === "bruchstein" || f.artifactId === "bruchstein") && f.stoneRound !== view.round && (
+          {duel.ruleStage === "voll" && (f.toolId === "bruchstein" || f.artifactId === "bruchstein") && f.stoneRound !== view.round && (
             <button type="button" className="btn" onClick={() => dispatch({ type: "stone" })}>
               Bruchstein
             </button>
           )}
-          {predict.map((kind) => (
+          {duel.ruleStage === "voll" && predict.map((kind) => (
             <button
               key={kind}
               type="button"
@@ -1214,7 +1241,7 @@ function Sigil({ id }: { id: string }) {
   );
 }
 
-function Codex({ onClose }: { onClose: () => void }) {
+function Codex({ ruleStage, onClose }: { ruleStage: RuleStage; onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-20 flex items-end justify-center bg-bg/80 p-3 sm:items-center" role="dialog" aria-label="Regelreferenz">
       <div className="panel max-h-[80dvh] w-full max-w-lg overflow-auto p-5">
@@ -1225,12 +1252,11 @@ function Codex({ onClose }: { onClose: () => void }) {
           </button>
         </div>
         <div className="mt-4 flex flex-col gap-3 text-sm text-muted">
-          <p>Sieg durch Körper 0, durch drei zerstörte Kern-Echos, oder wenn das Bruchmaximum die letzte Runde beendet.</p>
-          <p>Jede Runde: Energie +2, verdeckt planen, aufdecken, höherer Aktionswert zuerst, dann Echos und die Schlussprüfung.</p>
-          <p>Angriff trifft, wenn Würfel plus Angriffswert mindestens die Verteidigung erreicht. Eine 6 verdoppelt den Endschaden.</p>
-          <p>Schutz mildert den nächsten Treffer. Bewegung folgt den Verbindungen. Einfluss legt Spuren, schwächt Echos oder bricht Kerne.</p>
-          <p>Dieselbe Grundaktion zweimal hintereinander gibt dem Gegner einen Musterpunkt. Bei drei Punkten einer Farbe darfst du vorhersagen.</p>
-          <p>Ein Regelbruch pro Kampf. Ein Item und eine Reaktion pro Runde.</p>
+          <p>Regelstufe: {ruleStage === "kern" ? "Einfach" : "Vollregeln"}.</p>
+          <p>Sieg durch Körper 0 oder wenn das Bruchmaximum die letzte Runde beendet.{ruleStage === "voll" ? " In den Vollregeln gewinnt ihr zusätzlich durch drei zerstörte Kern-Echos." : ""}</p>
+          <p>Jede Runde: Energie +2, verdeckt planen, aufdecken und nach Aktionswert handeln. Ein Angriff trifft, wenn W6 + Angriff mindestens Verteidigung erreicht; Kraftbonus zählt auch zum Rohschaden.</p>
+          <p>Schutz verhindert 3 Schaden und 1 Bruch; mit eingesetzter Energie verhindert er 4 Schaden. Bewegung folgt den Verbindungen. Parade verhindert zusätzlich 2 Schaden und gibt 1 Energie zurück.</p>
+          {ruleStage === "voll" && <p>Echos, Kerne, Marker, Zustände, Items, Muster und ein Regelbruch pro Kampf ergänzen die Grundaktionen. Höchstens ein Item und ein Echo pro Runde.</p>}
         </div>
       </div>
     </div>
@@ -1242,7 +1268,7 @@ function shownState(duel: Duel, beat: Frame | null): GameState | null {
   if (duel.screen === "deploy") {
     const b = duel.mode === "bot" ? botSetup(duel.setup.A, duel.difficulty) : { ...duel.setup.B };
     if (duel.mode === "bot") b.field = duel.setup.A.field === 4 ? 3 : 5;
-    return createGame(duel.setup.A, b, 1);
+    return createGame(duel.setup.A, b, 1, duel.ruleStage);
   }
   return duel.game;
 }
@@ -1255,6 +1281,9 @@ function legalFields(duel: Duel, view: GameState): number[] {
   const stats = liveStats(f);
   if (duel.draft.action === "move") return reachable(f.field, moveSteps(f, duel.draft.energy, duel.draft.ability), foe.field);
   if (duel.draft.action === "attack") {
+    if (f.statuses.some((s) => s.kind === "confused")) {
+      return [1, 2, 3, 4, 5, 6, 7].filter((field) => distance(f.field, field) <= stats.range);
+    }
     const range = duel.draft.ability && f.characterId === "brecher" ? 1 : stats.range;
     if (f.weaponId === "bogen" && f.statuses.some((s) => s.kind === "bound")) return [];
     return distance(f.field, foe.field) <= range ? [foe.field] : [];
@@ -1267,7 +1296,11 @@ function withAction(draft: Plan, action: ActionKind, game: GameState, side: Side
   const f = game.fighters[side];
   const foe = game.fighters[other(side)];
   const next: Plan = { ...draft, action, ability: false };
-  if (action === "attack") next.targetField = foe.field;
+  if (action === "attack") {
+    next.targetField = f.statuses.some((status) => status.kind === "confused")
+      ? (draft.targetField ?? f.field)
+      : foe.field;
+  }
   if (action === "guard") next.targetField = f.field;
   if (action === "move") {
     const fields = reachable(f.field, moveSteps(f, next.energy, false), foe.field);
