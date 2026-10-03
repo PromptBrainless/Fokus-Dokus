@@ -1,5 +1,5 @@
-import { ARMORS, ECHO_LABEL, byId } from "./content";
-import type { ActionKind, EchoKind, Side } from "./content";
+import { ARMORS, ECHO_LABEL, byId } from "./content.ts";
+import type { ActionKind, EchoKind, Side } from "./content.ts";
 import {
   actionValue,
   addStatus,
@@ -25,7 +25,7 @@ import {
   type Fighter,
   type GameState,
   type Plan,
-} from "./model";
+} from "./model.ts";
 import {
   BLOCK_DAMAGE,
   BLOCK_ENERGY_DAMAGE,
@@ -36,7 +36,7 @@ import {
   HARD_HIT,
   MAX_BRUCH_PER_HIT,
   MIN_HIT,
-} from "./tuning";
+} from "./tuning.ts";
 
 export interface Frame {
   kicker: string;
@@ -47,6 +47,48 @@ export interface Frame {
   actor: Side | null;
   dice: number | null;
   state: GameState;
+}
+
+export function armorReduction(protectionBonus: number, armor: number): number {
+  return Math.ceil((Math.max(0, protectionBonus) + Math.max(0, armor)) / 2);
+}
+
+export function minimumHitDamage(raw: number, protectionBonus: number, armor: number): number {
+  return Math.max(MIN_HIT, raw - armorReduction(protectionBonus, armor));
+}
+
+export function protectedDamage(damage: number, reduction: number): number {
+  return Math.max(1, damage - reduction);
+}
+
+export function attackPreview(state: GameState, side: Side, plan: Plan) {
+  const attacker = state.fighters[side];
+  const defender = state.fighters[other(side)];
+  const attackStats = liveStats(attacker);
+  const defenseStats = liveStats(defender);
+  const attack = attackStats.weapon + attackStats.kraftB + plan.energy;
+  const defense = DEF_BASE + defenseStats.schutzB + defenseStats.moveB;
+  const threshold = defense - attack;
+  const successfulRolls = Math.max(0, Math.min(6, 7 - threshold));
+  const raw = attackStats.weapon + attackStats.kraftB + (ENERGY_RAW_BONUS[Math.min(3, plan.energy)] ?? 0);
+  const base = minimumHitDamage(raw, defenseStats.schutzB, defenseStats.armor);
+  const successfulDamage = Array.from({ length: 6 }, (_, index) => {
+    const die = index + 1;
+    return die >= threshold ? (die === 6 ? base * 2 : base) : null;
+  }).filter((value): value is number => value !== null);
+  const protectedHits = successfulDamage.map((damage) => protectedDamage(damage, BLOCK_DAMAGE));
+  return {
+    chance: Math.round((successfulRolls / 6) * 100),
+    damage: damageRange(successfulDamage),
+    protectedDamage: damageRange(protectedHits.map((damage) => protectedDamage(damage, BLOCK_DAMAGE))),
+    bruch: Math.min(MAX_BRUCH_PER_HIT, (plan.energy >= 2 ? 1 : 0) + (base >= HARD_HIT ? 1 : 0)),
+    cost: plan.energy,
+  };
+}
+
+function damageRange(values: number[]): [number, number] {
+  if (!values.length) return [0, 0];
+  return [Math.min(...values), Math.max(...values)];
 }
 
 const CONVERT: Partial<Record<EchoKind, EchoKind>> = {
@@ -279,10 +321,22 @@ function doMove(state: GameState, f: Fighter, foe: Fighter, plan: Plan, steps: n
     f.energy = Math.min(f.energyMax, f.energy + 1);
     f.leatherUsed = true;
   }
+  const moveEcho = fullRules(state)
+    ? f.echoes.find((echo) => echo.id === plan.echoId && echo.kind === "move" && echo.charges > 0)
+    : undefined;
   const bind = markerAt(state, f.field);
-  if (bind?.kind === "bind" && plan.energy <= 0 && f.characterId !== "laeuferin") {
-    note(state, `${name(f)} ist gefesselt und kommt nicht frei.`);
+  const crossesBind =
+    fullRules(state) &&
+    (hasStatus(f, "bound") ||
+      (!moveEcho && (path.some((field) => markerAt(state, field)?.kind === "bind") || bind?.kind === "bind")));
+  if (crossesBind && f.energy < 1) {
+    note(state, `${name(f)} kann die zusätzliche Energie für Gebundenheit oder die Fessel nicht zahlen.`);
     return;
+  }
+  if (crossesBind) f.energy -= 1;
+  if (moveEcho) {
+    moveEcho.charges -= 1;
+    moveEcho.used = true;
   }
   leaveField(state, f, plan);
   const land = path[path.length - 1];
@@ -298,20 +352,29 @@ function doMove(state: GameState, f: Fighter, foe: Fighter, plan: Plan, steps: n
     note(state, `${name(f)} hinterlässt ein Bewegungs-Echo auf Feld ${f.field}.`);
   }
   note(state, `${name(f)} geht nach Feld ${f.field}.`);
+  if (moveEcho) dropDeadEchoes(state, f, plan);
 }
 
-function attackEchoBonus(f: Fighter): { raw: number; bruch: number; echo: boolean } {
-  const echo = f.echoes.find((e) => e.kind === "attack" && e.field === f.field && e.charges > 0);
+function attackEchoBonus(f: Fighter, echoId: string | null): { raw: number; bruch: number; echo: boolean } {
+  const echo = f.echoes.find(
+    (e) => e.id === echoId && e.kind === "attack" && e.field === f.field && e.charges > 0,
+  );
   if (!echo) return { raw: 0, bruch: 0, echo: false };
+  const bruch = echo.charges >= 2 ? 1 : 0;
+  echo.charges -= 1;
   echo.used = true;
-  return { raw: 1, bruch: echo.charges >= 2 ? 1 : 0, echo: true };
+  return { raw: 1, bruch, echo: true };
 }
 
-function guardEchoSoak(f: Fighter): { dmg: number; bruch: number } {
-  const echo = f.echoes.find((e) => e.kind === "guard" && e.field === f.field && e.charges > 0);
+function guardEchoSoak(f: Fighter, echoId: string | null): { dmg: number; bruch: number } {
+  const echo = f.echoes.find(
+    (e) => e.id === echoId && e.kind === "guard" && e.field === f.field && e.charges > 0,
+  );
   if (!echo) return { dmg: 0, bruch: 0 };
+  const bruch = echo.charges >= 2 ? 1 : 0;
+  echo.charges -= 1;
   echo.used = true;
-  return { dmg: 2, bruch: echo.charges >= 2 ? 1 : 0 };
+  return { dmg: 2, bruch };
 }
 
 function resolveAttack(
@@ -358,7 +421,9 @@ function resolveAttack(
     (fullRules(state) && attacker.pursued ? 1 : 0);
   const marked = fullRules(state) && defender.marked && attacker.characterId === "jaeger";
   if (marked) attack += 2;
-  const echoB = fullRules(state) ? attackEchoBonus(attacker) : { raw: 0, bruch: 0, echo: false };
+  const echoB = fullRules(state)
+    ? attackEchoBonus(attacker, plan.echoId)
+    : { raw: 0, bruch: 0, echo: false };
   let defense = DEF_BASE + dStats.schutzB + dStats.moveB;
   if (attacker.weaponId === "bogen") defense -= Math.min(dStats.moveB, 1);
   const mist =
@@ -402,7 +467,7 @@ function resolveAttack(
   const armorReduction = Math.ceil((protection + aArmor(defender)) / 2);
   let end = Math.max(MIN_HIT, raw - armorReduction);
   if (blockedByBarrier) end = Math.max(0, end - 2);
-  const soak = guardEchoSoak(defender);
+  const soak = guardEchoSoak(defender, defenderPlan?.echoId ?? null);
   end = Math.max(0, end - soak.dmg);
   const guarded = defender.statuses.find((s) => s.kind === "guarded");
   let bruchMod = energyBruch + echoB.bruch - soak.bruch;
@@ -465,6 +530,7 @@ function resolveAttack(
     pushEcho(state, { owner: attacker.side, kind: "attack", field: attacker.field, charges: 2 });
     if (!guarded && !dodgedAll && dealt > 0) addStatus(defender, "wounded", 2);
   }
+  if (fullRules(state)) dropDeadEchoes(state, attacker, plan);
   if (attacker.weaponId === "kurzschwert" && !dodgedAll) {
     const back = freeNeighbor(attacker, defender, defender.field);
     if (back != null) attacker.field = back;
@@ -552,8 +618,45 @@ function crackCore(state: GameState, attacker: Fighter, defender: Fighter, point
 
 function doInfluence(state: GameState, f: Fighter, foe: Fighter, plan: Plan): boolean {
   if (!fullRules(state)) return false;
+  if (plan.influence === "marker") {
+    const kind = plan.markerKind;
+    const field = plan.targetField;
+    const cost = kind === "mirror" ? 1 : 2;
+    const ownMarker = state.markers.some((marker) => marker.owner === f.side);
+    if (
+      kind &&
+      ["brand", "mirror", "rift", "bind"].includes(kind) &&
+      field != null &&
+      plan.energy >= cost &&
+      distance(f.field, field) <= 3 &&
+      field !== f.field &&
+      field !== foe.field &&
+      !markerAt(state, field) &&
+      !ownMarker
+    ) {
+      placeMarker(state, f.side, kind, field, 2);
+      note(state, `${name(f)} prägt einen ${kind}-Marker auf Feld ${field} für 2 Runden.`);
+    } else {
+      note(state, `${name(f)} kann den Feldmarker dort nicht prägen.`);
+    }
+    return false;
+  }
   const dist = distance(f.field, foe.field);
-  const reach = influenceRange(state, f);
+  const influenceEcho =
+    plan.influence !== "convert"
+      ? f.echoes.find(
+          (echo) =>
+            echo.id === plan.echoId &&
+            echo.kind === "influence" &&
+            echo.field === f.field &&
+            echo.charges > 0,
+        )
+      : undefined;
+  if (influenceEcho) {
+    influenceEcho.charges -= 1;
+    influenceEcho.used = true;
+  }
+  const reach = influenceRange(state, f, influenceEcho?.id);
   const inReach = dist <= reach;
   if (inReach) foe.cores.forEach((c) => (c.revealed = true));
   if (plan.ability && f.characterId === "archivar") {
@@ -627,6 +730,7 @@ function doInfluence(state: GameState, f: Fighter, foe: Fighter, plan: Plan): bo
       echo.used = true;
     }
   }
+  if (influenceEcho) dropDeadEchoes(state, f, plan);
   return false;
 }
 
@@ -672,7 +776,7 @@ function perform(
     return { ended: false, tone: "guard", title: `${name(f)} schützt sich`, detail: state.log[0] ?? "", dice: null };
   }
   if (plan.action === "move") {
-    const steps = moveSteps(f, plan.energy, plan.ability);
+    const steps = moveSteps(f, plan.energy, plan.ability, plan.echoId);
     const dest = plan.targetField ?? f.field;
     const legal = reachable(f.field, steps, foe.field);
     if (!legal.includes(dest)) {
@@ -906,6 +1010,7 @@ export function preparePlan(state: GameState, side: Side, plan: Plan): Plan {
     next.itemId = null;
     next.influence = "spur";
     next.echoId = null;
+    next.markerKind = null;
     next.ruleBreak = null;
     next.prediction = null;
     next.zeitnadel = false;
@@ -930,6 +1035,17 @@ export function preparePlan(state: GameState, side: Side, plan: Plan): Plan {
     }
   }
   next.energy = Math.max(0, Math.min(3, next.energy, f.energy));
+  if (next.echoId) {
+    const selected = f.echoes.find((echo) => echo.id === next.echoId && echo.charges > 0);
+    const valid =
+      selected &&
+      ((next.action === "attack" && selected.kind === "attack" && selected.field === f.field) ||
+        (next.action === "guard" && selected.kind === "guard" && selected.field === f.field) ||
+        (next.action === "move" && selected.kind === "move" && selected.field === f.field) ||
+        (next.itemId === "splitter" && next.action !== "influence") ||
+        (next.action === "influence" && (next.influence === "convert" || selected.kind === "influence")));
+    if (!valid) next.echoId = null;
+  }
   if (next.itemId && !f.items.some((i) => i.id === next.itemId && !i.spent)) next.itemId = null;
   if (next.prediction && f.pattern[next.prediction] < 3) next.prediction = null;
   if (next.ruleBreak && !f.ruleBreak) next.ruleBreak = null;
@@ -948,7 +1064,7 @@ export function preparePlan(state: GameState, side: Side, plan: Plan): Plan {
     }
   }
   if (next.action === "move") {
-    const steps = moveSteps(f, next.energy, next.ability);
+    const steps = moveSteps(f, next.energy, next.ability, next.echoId);
     const legal = reachable(f.field, steps, foe.field);
     if (next.targetField == null || !legal.includes(next.targetField)) next.targetField = legal[0] ?? null;
     if (next.targetField == null) {
@@ -959,10 +1075,28 @@ export function preparePlan(state: GameState, side: Side, plan: Plan): Plan {
   }
   if (next.action === "guard") next.targetField = f.field;
   if (next.action === "influence") {
-    if (next.influence === "kern" && (next.energy < 1 || distance(f.field, foe.field) > influenceRange(state, f))) {
+    if (next.influence === "kern" && (next.energy < 1 || distance(f.field, foe.field) > influenceRange(state, f, next.echoId))) {
       next.influence = "spur";
     }
-    next.targetField = foe.field;
+    if (next.influence === "marker") {
+      const markerCost = next.markerKind === "mirror" ? 1 : 2;
+      const field = next.targetField;
+      const allowed = ["brand", "mirror", "rift", "bind"].includes(next.markerKind ?? "");
+      if (
+        !allowed ||
+        next.energy < markerCost ||
+        field == null ||
+        distance(f.field, field) > 3 ||
+        field === f.field ||
+        field === foe.field ||
+        markerAt(state, field) ||
+        state.markers.some((marker) => marker.owner === side)
+      ) {
+        next.influence = "spur";
+        next.markerKind = null;
+        next.targetField = f.field;
+      }
+    } else next.targetField = foe.field;
   }
   if (next.reaction) {
     const cost = next.reaction === "stabilize" ? 1 : next.reaction === "parry" ? 0 : 2;

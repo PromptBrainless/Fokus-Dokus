@@ -17,8 +17,8 @@ import {
   SUGGESTED,
   WEAPONS,
   byId,
-} from "./content";
-import { CORE_POINTS } from "./tuning";
+} from "./content.ts";
+import { CORE_POINTS } from "./tuning.ts";
 
 export interface Echo {
   id: string;
@@ -108,6 +108,7 @@ export interface Plan {
   mist: boolean;
   mask: boolean;
   freeConvert: boolean;
+  markerKind?: MarkerKind | null;
 }
 
 export interface GameState {
@@ -352,6 +353,8 @@ export function createGame(
       fighter.items = [];
       fighter.cores = [];
       fighter.echoes = [];
+      fighter.ruleBreak = false;
+      fighter.pattern = { attack: 0, guard: 0, move: 0, influence: 0 };
     }
   }
   return {
@@ -387,6 +390,7 @@ export function emptyPlan(): Plan {
     mist: false,
     mask: false,
     freeConvert: false,
+    markerKind: null,
   };
 }
 
@@ -513,18 +517,23 @@ export function pushEcho(state: GameState, echo: Omit<Echo, "id" | "used" | "ttl
   });
 }
 
-export function influenceRange(state: GameState, f: Fighter): number {
-  const echo = f.echoes.find((e) => e.kind === "influence" && e.field === f.field && e.charges > 0);
+export function influenceRange(state: GameState, f: Fighter, echoId?: string | null): number {
+  const echo = f.echoes.find(
+    (e) => e.kind === "influence" && e.field === f.field && e.charges > 0 && e.id === echoId,
+  );
   return echo ? 4 : 3;
 }
 
-export function moveSteps(f: Fighter, energy: number, ability: boolean): number {
+export function moveSteps(f: Fighter, energy: number, ability: boolean, echoId?: string | null): number {
   if (ability && f.characterId === "laeuferin") return 2;
   const stats = liveStats(f);
   let steps = stats.moveRange;
   if (energy >= 1) steps += 1;
   if (energy >= 2) steps += 1;
   if (hasStatus(f, "bound")) steps -= 1;
+  if (echoId && f.echoes.some((echo) => echo.id === echoId && echo.kind === "move" && echo.charges > 0)) {
+    steps += 1;
+  }
   return Math.max(0, steps);
 }
 

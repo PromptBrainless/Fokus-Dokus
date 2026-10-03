@@ -1,4 +1,4 @@
-import type { ActionKind, Difficulty, Side } from "./content";
+import type { ActionKind, Difficulty, Side } from "./content.ts";
 import {
   distance,
   emptyPlan,
@@ -9,8 +9,8 @@ import {
   reachable,
   type GameState,
   type Plan,
-} from "./model";
-import { preparePlan } from "./resolve";
+} from "./model.ts";
+import { preparePlan } from "./resolve.ts";
 
 function bestPattern(state: GameState, side: Side): ActionKind | null {
   if (state.ruleStage === "kern") return null;

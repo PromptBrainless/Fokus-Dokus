@@ -45,7 +45,7 @@ import {
   type Plan,
   type Setup,
 } from "@/game/model";
-import { beginRound, preparePlan, pressStone, resolveRound, type Frame } from "@/game/resolve";
+import { attackPreview, beginRound, preparePlan, pressStone, resolveRound, type Frame } from "@/game/resolve";
 import { Board } from "./board";
 
 type Screen = "title" | "roster" | "kit" | "deploy" | "cover" | "plan" | "scene" | "end" | "ledger";
@@ -846,7 +846,15 @@ function Planner({ duel, view, dispatch }: { duel: Duel; view: GameState; dispat
   const ready = preparePlan(view, duel.focus, draft);
   const abilityUsed = f.abilityRound === view.round;
   const canAbility = f.energy >= c.abilityCost && !abilityUsed;
+  const preview = ready.action === "attack" ? attackPreview(view, duel.focus, ready) : null;
   const predict = (Object.entries(f.pattern) as [ActionKind, number][]).filter(([, n]) => n >= 3).map(([k]) => k);
+  const availableEchoes = f.echoes.filter((echo) => {
+    if (echo.charges <= 0) return false;
+    if (draft.action === "attack") return echo.kind === "attack" && echo.field === f.field;
+    if (draft.action === "guard") return echo.kind === "guard" && echo.field === f.field;
+    if (draft.action === "move") return echo.kind === "move" && echo.field === f.field;
+    return draft.influence === "convert" || (echo.kind === "influence" && echo.field === f.field);
+  });
   return (
     <footer className="max-h-64 overflow-auto border-t border-line bg-surface px-3 py-3">
       <div className="mx-auto flex max-w-5xl flex-col gap-3">
@@ -914,6 +922,7 @@ function Planner({ duel, view, dispatch }: { duel: Duel; view: GameState; dispat
                 ["kern", "Kern brechen"],
                 ["weaken", "Echo schwächen"],
                 ["convert", "Umwandeln"],
+                ["marker", "Feld prägen"],
               ] as const
             ).map(([id, label]) => (
               <button
@@ -923,6 +932,55 @@ function Planner({ duel, view, dispatch }: { duel: Duel; view: GameState; dispat
                 onClick={() => dispatch({ type: "draft", plan: { ...draft, influence: id } })}
               >
                 {label}
+              </button>
+            ))}
+          </div>
+        )}
+        {duel.ruleStage === "voll" && draft.action === "influence" && draft.influence === "marker" && (
+          <div className="flex flex-wrap gap-2">
+            {([
+              ["mirror", "Spiegel", 1],
+              ["brand", "Brand", 2],
+              ["rift", "Riss", 2],
+              ["bind", "Fessel", 2],
+            ] as const).map(([kind, label, cost]) => (
+              <button
+                key={kind}
+                type="button"
+                className={`btn ${draft.markerKind === kind ? "btn-on" : ""}`}
+                onClick={() =>
+                  dispatch({
+                    type: "draft",
+                    plan: {
+                      ...draft,
+                      markerKind: kind,
+                      energy: Math.max(draft.energy, cost),
+                      targetField: legalFields(duel, view)[0] ?? null,
+                    },
+                  })
+                }
+              >
+                {label} · {cost} Energie
+              </button>
+            ))}
+          </div>
+        )}
+        {duel.ruleStage === "voll" && availableEchoes.length > 0 && (
+          <div className="flex flex-wrap gap-2" aria-label="Echo auswählen">
+            {availableEchoes.map((echo) => (
+              <button
+                key={echo.id}
+                type="button"
+                className={`btn ${draft.echoId === echo.id ? "btn-on" : ""}`}
+                aria-pressed={draft.echoId === echo.id}
+                onClick={() =>
+                  dispatch({
+                    type: "draft",
+                    plan: { ...draft, echoId: draft.echoId === echo.id ? null : echo.id },
+                  })
+                }
+              >
+                Echo {ECHO_LABEL[echo.kind]} · {echo.charges}
               </button>
             ))}
           </div>
@@ -1005,6 +1063,13 @@ function Planner({ duel, view, dispatch }: { duel: Duel; view: GameState; dispat
           ))}
         </div>
         <p className="text-sm text-muted">{planHint(c, draft, ready, f, view)}</p>
+        {preview && (
+          <p className="rounded-md border border-line px-3 py-2 text-xs text-muted" aria-live="polite">
+            Trefferchance {preview.chance}% · Schaden {preview.damage[0]}–{preview.damage[1]} ohne Schutz ·{" "}
+            {preview.protectedDamage[0]}–{preview.protectedDamage[1]} mit Schutz · bis {preview.bruch} Bruch ·{" "}
+            {preview.cost} Energie
+          </p>
+        )}
         <div className="sticky bottom-0 bg-surface pt-2">
           <button type="button" className="btn btn-primary w-full" onClick={() => { cue("idle", duel.muted); dispatch({ type: "lock" }); }}>
             Plan schließen
@@ -1289,6 +1354,16 @@ function legalFields(duel: Duel, view: GameState): number[] {
     return distance(f.field, foe.field) <= range ? [foe.field] : [];
   }
   if (duel.draft.action === "influence" && duel.draft.influence === "kern") return [foe.field];
+  if (duel.draft.action === "influence" && duel.draft.influence === "marker") {
+    if (view.markers.some((marker) => marker.owner === f.side)) return [];
+    return [1, 2, 3, 4, 5, 6, 7].filter(
+      (field) =>
+        field !== f.field &&
+        field !== foe.field &&
+        distance(f.field, field) <= 3 &&
+        !view.markers.some((marker) => marker.field === field),
+    );
+  }
   return [];
 }
 
@@ -1312,7 +1387,9 @@ function withAction(draft: Plan, action: ActionKind, game: GameState, side: Side
 
 function planHint(c: (typeof CHARACTERS)[number], draft: Plan, ready: Plan, f: Fighter, view: GameState): string {
   if (draft.ability) return c.abilityText;
-  if (draft.action === "attack" && ready.action !== "attack") return "Nicht in Reichweite. Der Plan wird zu Schutz.";
+  if (draft.action === "attack" && distance(f.field, view.fighters[other(f.side)].field) > liveStats(f).range) {
+    return "Außer Reichweite: Die Energie bleibt verbraucht und du erhältst 1 Bruch.";
+  }
   if (draft.action === "move") return ready.targetField ? `Ziel Feld ${ready.targetField}. Besetzte Felder bleiben zu.` : "Kein freies Feld in Reichweite.";
   if (draft.action === "guard") {
     const power = Math.max(2, liveStats(f).schutzB);
