@@ -207,15 +207,6 @@ export function Board({
       {(["A", "B"] as Side[]).map((side) => {
         const fighter = state.fighters[side];
         const [x, y] = POS[fighter.field];
-        const glyph = fighter.characterId === "laeuferin"
-          ? "L"
-          : fighter.characterId === "waechter"
-            ? "W"
-            : fighter.characterId === "archivar"
-              ? "A"
-              : fighter.characterId === "brecher"
-                ? "B"
-                : "J";
         const acting = actor === side && tone !== "idle";
         const targeted = actor !== null && actor !== side && (tone === "hit" || tone === "miss");
         return (
