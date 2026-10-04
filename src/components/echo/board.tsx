@@ -1,4 +1,4 @@
-import { EDGES, ECHO_LABEL, POS } from "@/game/content";
+import { CHARACTERS, EDGES, ECHO_LABEL, POS } from "@/game/content";
 import type { EchoKind, Side } from "@/game/content";
 import { neighbors, other, type GameState } from "@/game/model";
 
@@ -48,6 +48,13 @@ export function Board({
   const effectSide = tone === "hit" || tone === "miss" ? (actor ? other(actor) : null) : actor;
   const effectField = effectSide ? state.fighters[effectSide].field : focus[0];
   const effectPosition = effectField ? POS[effectField] : null;
+  const fighterDescription = (["A", "B"] as Side[])
+    .map((side) => {
+      const fighter = state.fighters[side];
+      const name = CHARACTERS.find((character) => character.id === fighter.characterId)?.name ?? fighter.characterId;
+      return `${name} (${side}) auf Feld ${fighter.field}`;
+    })
+    .join(", ");
 
   return (
     <svg
@@ -56,9 +63,14 @@ export function Board({
       data-tone={tone}
       data-actor={actor ?? undefined}
       role="img"
-      aria-label="Spielfeld mit sieben Feldern"
+      aria-label={`Spielfeld mit sieben Feldern. ${fighterDescription}.`}
     >
       <defs>
+        {(["A", "B"] as Side[]).map((side) => (
+          <clipPath key={side} id={`fighter-portrait-${side.toLowerCase()}`} clipPathUnits="userSpaceOnUse">
+            <circle cx="0" cy="0" r="35" />
+          </clipPath>
+        ))}
         <linearGradient id="board-ground" x1="0" y1="0" x2="1" y2="1">
           <stop offset="0" stopColor="var(--color-board)" />
           <stop offset="0.54" stopColor="var(--color-bg)" />
@@ -195,15 +207,6 @@ export function Board({
       {(["A", "B"] as Side[]).map((side) => {
         const fighter = state.fighters[side];
         const [x, y] = POS[fighter.field];
-        const glyph = fighter.characterId === "laeuferin"
-          ? "L"
-          : fighter.characterId === "waechter"
-            ? "W"
-            : fighter.characterId === "archivar"
-              ? "A"
-              : fighter.characterId === "brecher"
-                ? "B"
-                : "J";
         const acting = actor === side && tone !== "idle";
         const targeted = actor !== null && actor !== side && (tone === "hit" || tone === "miss");
         return (
@@ -216,10 +219,16 @@ export function Board({
             <circle className="fighter-shadow" r="54" />
             <circle className="fighter-outline" r="48" />
             <circle className="fighter-core" r="40" />
+            <image
+              href={`/figuren/${fighter.characterId}.png`}
+              x="-37"
+              y="-42"
+              width="74"
+              height="100"
+              preserveAspectRatio="xMidYMid slice"
+              clipPath={`url(#fighter-portrait-${side.toLowerCase()})`}
+            />
             <path className="fighter-cut" d="m0-30 26 15v30L0 30l-26-15v-30z" />
-            <text y="1" textAnchor="middle" dominantBaseline="central" className="fighter-glyph">
-              {glyph}
-            </text>
             <text y="58" textAnchor="middle" className="fighter-side">
               {side}
             </text>
