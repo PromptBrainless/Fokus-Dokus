@@ -1,3 +1,5 @@
+![ECHO//BRUCH](docs/REPOSITORY-COVER.svg)
+
 # ECHO//BRUCH
 
 Taktisches Zwei-Spieler-Spiel mit simultaner Aktionsplanung. Die bestehende
@@ -37,3 +39,10 @@ Die externe Quellensammlung ist in [Web app asset links](Web%20app%20asset%20lin
 aufgeführt. Prüfe vor dem Einbau jeweils Lizenz, Namensnennung und erlaubte
 kommerzielle Nutzung. Die vorhandenen Spielgrafiken und Referenzen sind in
 `public/` und `attachments/`.
+
+
+---
+
+## Repository identity
+
+This repository uses a versioned visual cover in `docs/REPOSITORY-COVER.svg` to make its scope visible at a glance.
